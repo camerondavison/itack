@@ -15,10 +15,10 @@ pub struct EditArgs {
 pub fn run(args: EditArgs) -> Result<()> {
     let project = Project::discover()?;
 
-    // Verify issue exists
-    let _ = load_issue(&project.itack_dir, args.id)?;
+    // Load issue to get its path (supports both old and new filename formats)
+    let issue_info = load_issue(&project.itack_dir, args.id)?;
 
-    let path = project.issue_path(args.id);
+    let path = issue_info.path;
     let editor = project.config.get_editor();
 
     let status = Command::new(&editor)

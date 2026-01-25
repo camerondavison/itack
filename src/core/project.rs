@@ -82,9 +82,16 @@ impl Project {
         Database::open(&self.db_path, &self.itack_dir)
     }
 
-    /// Get the path to an issue file.
-    pub fn issue_path(&self, id: u32) -> PathBuf {
-        self.itack_dir.join(format!("{}.md", id))
+    /// Get the path to an issue file (new format: YYYY-MM-DD-issue-NNN.md).
+    /// Requires the creation date to generate the filename.
+    pub fn issue_path_with_date(
+        &self,
+        id: u32,
+        created: &chrono::DateTime<chrono::Utc>,
+    ) -> PathBuf {
+        let date_str = created.format("%Y-%m-%d").to_string();
+        self.itack_dir
+            .join(format!("{}-issue-{:03}.md", date_str, id))
     }
 }
 

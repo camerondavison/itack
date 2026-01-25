@@ -6,6 +6,22 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
+/// Find an issue file by ID in the .itack directory.
+/// Returns the path to the issue file (supports new format: YYYY-MM-DD-issue-NNN.md).
+fn find_issue_file(itack_dir: &Path, id: u32) -> Option<std::path::PathBuf> {
+    let suffix = format!("-issue-{:03}.md", id);
+    if let Ok(entries) = fs::read_dir(itack_dir) {
+        for entry in entries.flatten() {
+            let filename = entry.file_name();
+            let filename_str = filename.to_string_lossy();
+            if filename_str.ends_with(&suffix) {
+                return Some(entry.path());
+            }
+        }
+    }
+    None
+}
+
 /// Test environment with isolated git repo and database directory.
 struct TestEnv {
     /// Temporary git repository.
@@ -123,8 +139,9 @@ fn test_create_and_show_issue() {
         .success()
         .stdout(predicate::str::contains("Created issue #1"));
 
-    // Verify file was created
-    assert!(env.path().join(".itack/1.md").exists());
+    // Verify file was created (new format: YYYY-MM-DD-issue-001.md)
+    let issue_file = find_issue_file(&env.path().join(".itack"), 1);
+    assert!(issue_file.is_some(), "Issue file should exist");
 
     // Show the issue
     itack(&env)
@@ -465,7 +482,10 @@ fn test_markdown_file_format() {
         .assert()
         .success();
 
-    let content = fs::read_to_string(env.path().join(".itack/1.md")).unwrap();
+    // Find the issue file (new format: YYYY-MM-DD-issue-001.md)
+    let issue_file =
+        find_issue_file(&env.path().join(".itack"), 1).expect("Issue file should exist");
+    let content = fs::read_to_string(&issue_file).unwrap();
 
     // Check YAML front matter format
     assert!(content.starts_with("---\n"));
@@ -473,4 +493,15 @@ fn test_markdown_file_format() {
     assert!(content.contains("title: Test issue"));
     assert!(content.contains("epic: MVP"));
     assert!(content.contains("status: open"));
+
+    // Check filename format (YYYY-MM-DD-issue-001.md)
+    let filename = issue_file.file_name().unwrap().to_string_lossy();
+    assert!(
+        filename.ends_with("-issue-001.md"),
+        "Filename should end with -issue-001.md"
+    );
+    assert!(
+        filename.len() == 23,
+        "Filename should be YYYY-MM-DD-issue-001.md format (23 chars)"
+    );
 }

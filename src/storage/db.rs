@@ -390,9 +390,24 @@ pub fn load_all_issues(issues_dir: &Path) -> Result<Vec<IssueInfo>> {
 }
 
 /// Load a single issue by ID.
+/// Checks both new format (YYYY-MM-DD-issue-NNN.md) and old format (N.md).
 pub fn load_issue(issues_dir: &Path, id: u32) -> Result<IssueInfo> {
-    let path = issues_dir.join(format!("{}.md", id));
+    // Check for new format files first (pattern: *-issue-{id:03}.md)
+    let suffix = format!("-issue-{:03}.md", id);
+    if let Ok(entries) = fs::read_dir(issues_dir) {
+        for entry in entries.flatten() {
+            let filename = entry.file_name();
+            let filename_str = filename.to_string_lossy();
+            if filename_str.ends_with(&suffix) {
+                let path = entry.path();
+                let (issue, body) = markdown::read_issue(&path)?;
+                return Ok(IssueInfo { issue, body, path });
+            }
+        }
+    }
 
+    // Fall back to old format
+    let path = issues_dir.join(format!("{}.md", id));
     if !path.exists() {
         return Err(ItackError::IssueNotFound(id));
     }
