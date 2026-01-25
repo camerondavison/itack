@@ -173,6 +173,51 @@ impl Database {
         Ok(())
     }
 
+    /// Repair state tables (claims and next_issue_id) by rescanning issue files.
+    /// Unlike create_or_rebuild, this always runs regardless of schema version.
+    pub fn repair_state(&mut self) -> Result<()> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Exclusive)?;
+
+        // Clear and rebuild state tables
+        tx.execute("DELETE FROM claims", [])?;
+        tx.execute("DELETE FROM state", [])?;
+
+        // Scan .itack/*.md files to rebuild state
+        let mut max_id: u32 = 0;
+
+        if self.issues_dir.exists() {
+            for entry in fs::read_dir(&self.issues_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+
+                if path.extension().map(|e| e == "md").unwrap_or(false) {
+                    if let Ok((issue, _)) = markdown::read_issue(&path) {
+                        max_id = max_id.max(issue.id);
+
+                        // Rebuild claims from assignee field
+                        if let Some(assignee) = &issue.assignee {
+                            tx.execute(
+                                "INSERT OR REPLACE INTO claims (issue_id, assignee, claimed_at) VALUES (?1, ?2, ?3)",
+                                params![issue.id, assignee, issue.created.to_rfc3339()],
+                            )?;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Set next_issue_id to max + 1
+        tx.execute(
+            "INSERT INTO state (id, next_issue_id) VALUES (1, ?1)",
+            params![max_id + 1],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Atomically get and increment the next issue ID.
     pub fn next_issue_id(&self) -> Result<u32> {
         let id: u32 = self.conn.query_row(
