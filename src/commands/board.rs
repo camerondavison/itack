@@ -22,6 +22,10 @@ pub struct BoardSummary {
 /// Show project board overview.
 pub fn run(args: BoardArgs) -> Result<()> {
     let project = Project::discover()?;
+
+    // Verify database exists (will error with helpful message if not)
+    let _db = project.open_db()?;
+
     let issues = load_all_issues(&project.itack_dir)?;
 
     let summary = BoardSummary {

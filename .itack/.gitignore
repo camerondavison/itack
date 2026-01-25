@@ -1,0 +1,4 @@
+# itack ignores
+*.db
+*.db-wal
+*.db-shm
