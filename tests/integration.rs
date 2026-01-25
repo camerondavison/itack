@@ -3,58 +3,83 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
+use std::path::Path;
 use tempfile::TempDir;
 
-fn itack() -> Command {
-    Command::cargo_bin("itack").unwrap()
+/// Test environment with isolated git repo and database directory.
+struct TestEnv {
+    /// Temporary git repository.
+    repo: TempDir,
+    /// Temporary directory for ITACK_HOME (database storage).
+    itack_home: TempDir,
 }
 
-fn setup_git_repo() -> TempDir {
-    let dir = TempDir::new().unwrap();
+impl TestEnv {
+    fn path(&self) -> &Path {
+        self.repo.path()
+    }
+
+    fn itack_home_str(&self) -> &str {
+        self.itack_home.path().to_str().unwrap()
+    }
+}
+
+fn itack(env: &TestEnv) -> Command {
+    let mut cmd = Command::cargo_bin("itack").unwrap();
+    cmd.env("ITACK_HOME", env.itack_home_str());
+    cmd
+}
+
+fn setup_git_repo() -> TestEnv {
+    let repo = TempDir::new().unwrap();
+    let itack_home = TempDir::new().unwrap();
 
     // Initialize git repo
     std::process::Command::new("git")
         .args(["init"])
-        .current_dir(dir.path())
+        .current_dir(repo.path())
         .output()
         .expect("Failed to init git repo");
 
     // Configure git user for the repo
     std::process::Command::new("git")
         .args(["config", "user.email", "test@test.com"])
-        .current_dir(dir.path())
+        .current_dir(repo.path())
         .output()
         .expect("Failed to configure git email");
 
     std::process::Command::new("git")
         .args(["config", "user.name", "Test User"])
-        .current_dir(dir.path())
+        .current_dir(repo.path())
         .output()
         .expect("Failed to configure git name");
 
-    dir
+    TestEnv { repo, itack_home }
 }
 
 #[test]
 fn test_init_creates_itack_directory() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Initialized itack project"));
 
-    assert!(dir.path().join(".itack").exists());
-    assert!(dir.path().join(".itack/metadata.toml").exists());
+    assert!(env.path().join(".itack").exists());
+    assert!(env.path().join(".itack/metadata.toml").exists());
 }
 
 #[test]
 fn test_init_fails_without_git() {
     let dir = TempDir::new().unwrap();
+    let itack_home = TempDir::new().unwrap();
 
-    itack()
+    Command::cargo_bin("itack")
+        .unwrap()
+        .env("ITACK_HOME", itack_home.path())
         .arg("init")
         .current_dir(dir.path())
         .assert()
@@ -64,18 +89,18 @@ fn test_init_fails_without_git() {
 
 #[test]
 fn test_init_repairs_if_already_initialized() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // Running init again should repair/succeed (not fail)
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Repaired database"));
@@ -83,37 +108,37 @@ fn test_init_repairs_if_already_initialized() {
 
 #[test]
 fn test_create_and_show_issue() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Test issue", "--epic", "MVP"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Created issue #1"));
 
     // Verify file was created
-    assert!(dir.path().join(".itack/1.md").exists());
+    assert!(env.path().join(".itack/1.md").exists());
 
     // Show the issue
-    itack()
+    itack(&env)
         .args(["show", "1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Test issue"))
         .stdout(predicate::str::contains("MVP"));
 
     // Show as JSON
-    itack()
+    itack(&env)
         .args(["show", "1", "--json"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("\"title\": \"Test issue\""));
@@ -121,17 +146,17 @@ fn test_create_and_show_issue() {
 
 #[test]
 fn test_show_nonexistent_issue() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["show", "999"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains("Issue 999 not found"));
@@ -139,48 +164,48 @@ fn test_show_nonexistent_issue() {
 
 #[test]
 fn test_list_issues() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "First issue"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Second issue", "--epic", "MVP"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // List all
-    itack()
+    itack(&env)
         .arg("list")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("First issue"))
         .stdout(predicate::str::contains("Second issue"));
 
     // List with epic filter
-    itack()
+    itack(&env)
         .args(["list", "--epic", "MVP"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Second issue"))
         .stdout(predicate::str::contains("First issue").not());
 
     // List as JSON
-    itack()
+    itack(&env)
         .args(["list", "--json"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("\"id\": 1"))
@@ -189,32 +214,32 @@ fn test_list_issues() {
 
 #[test]
 fn test_done_command() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Test issue"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // Mark as done
-    itack()
+    itack(&env)
         .args(["done", "1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("open -> done"));
 
     // Verify in list
-    itack()
+    itack(&env)
         .args(["list", "--status", "done"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Test issue"));
@@ -222,49 +247,49 @@ fn test_done_command() {
 
 #[test]
 fn test_claim_and_release() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Test issue"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // Claim the issue
-    itack()
+    itack(&env)
         .args(["claim", "1", "agent-1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Claimed issue #1 for agent-1"));
 
     // Verify status changed to in-progress
-    itack()
+    itack(&env)
         .args(["show", "1", "--json"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\": \"in-progress\""))
         .stdout(predicate::str::contains("\"assignee\": \"agent-1\""));
 
     // Release the claim
-    itack()
+    itack(&env)
         .args(["release", "1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Released issue #1"));
 
     // Verify assignee is removed
-    itack()
+    itack(&env)
         .args(["show", "1", "--json"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("\"assignee\": null"));
@@ -272,31 +297,31 @@ fn test_claim_and_release() {
 
 #[test]
 fn test_claim_conflict_returns_exit_code_2() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Test issue"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // First claim succeeds
-    itack()
+    itack(&env)
         .args(["claim", "1", "agent-1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // Second claim fails with exit code 2
-    itack()
+    itack(&env)
         .args(["claim", "1", "agent-2"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .code(2)
         .stderr(predicate::str::contains("already claimed by agent-1"));
@@ -304,24 +329,24 @@ fn test_claim_conflict_returns_exit_code_2() {
 
 #[test]
 fn test_release_unclaimed_issue() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Test issue"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // Release unclaimed issue fails
-    itack()
+    itack(&env)
         .args(["release", "1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains("not claimed"));
@@ -329,45 +354,45 @@ fn test_release_unclaimed_issue() {
 
 #[test]
 fn test_board_command() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Issue 1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Issue 2"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["done", "1"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
     // Board shows summary
-    itack()
+    itack(&env)
         .arg("board")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Open"))
         .stdout(predicate::str::contains("Done"));
 
     // Board as JSON
-    itack()
+    itack(&env)
         .args(["board", "--json"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("\"open\": 1"))
@@ -376,17 +401,17 @@ fn test_board_command() {
 
 #[test]
 fn test_done_nonexistent_issue() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["done", "999"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains("Issue 999 not found"));
@@ -394,31 +419,31 @@ fn test_done_nonexistent_issue() {
 
 #[test]
 fn test_issue_ids_increment() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "First"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("#1"));
 
-    itack()
+    itack(&env)
         .args(["create", "Second"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("#2"));
 
-    itack()
+    itack(&env)
         .args(["create", "Third"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("#3"));
@@ -426,21 +451,21 @@ fn test_issue_ids_increment() {
 
 #[test]
 fn test_markdown_file_format() {
-    let dir = setup_git_repo();
+    let env = setup_git_repo();
 
-    itack()
+    itack(&env)
         .arg("init")
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    itack()
+    itack(&env)
         .args(["create", "Test issue", "--epic", "MVP"])
-        .current_dir(dir.path())
+        .current_dir(env.path())
         .assert()
         .success();
 
-    let content = fs::read_to_string(dir.path().join(".itack/1.md")).unwrap();
+    let content = fs::read_to_string(env.path().join(".itack/1.md")).unwrap();
 
     // Check YAML front matter format
     assert!(content.starts_with("---\n"));

@@ -19,8 +19,14 @@ pub struct Config {
 }
 
 impl Config {
-    /// Get the global config directory path (~/.itack/).
+    /// Get the global config directory path.
+    ///
+    /// Uses `ITACK_HOME` environment variable if set, otherwise `~/.itack/`.
+    /// This allows tests to redirect database storage to a temp directory.
     pub fn global_dir() -> Option<PathBuf> {
+        if let Ok(home) = std::env::var("ITACK_HOME") {
+            return Some(PathBuf::from(home));
+        }
         dirs::home_dir().map(|h| h.join(".itack"))
     }
 
