@@ -1,0 +1,20 @@
+{
+  "name": "itack",
+  "metadata": {
+    "description": "Git-backed issue tracker for multi-agent coordination"
+  },
+  "owner": {
+    "name": "itack"
+  },
+  "plugins": [
+    {
+      "name": "itack",
+      "description": "itack issue tracker skills",
+      "source": "./plugins",
+      "version": "0.1.0",
+      "skills": [
+        "./itack"
+      ]
+    }
+  ]
+}
