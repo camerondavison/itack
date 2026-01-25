@@ -8,6 +8,7 @@ use crate::storage::write_issue;
 pub struct CreateArgs {
     pub title: String,
     pub epic: Option<String>,
+    pub body: Option<String>,
 }
 
 /// Create a new issue.
@@ -23,7 +24,7 @@ pub fn run(args: CreateArgs) -> Result<()> {
 
     // Write to markdown file
     let path = project.issue_path(id);
-    write_issue(&path, &issue, "")?;
+    write_issue(&path, &issue, args.body.as_deref().unwrap_or(""))?;
 
     println!("Created issue #{}: {}", id, args.title);
 

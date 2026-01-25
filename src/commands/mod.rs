@@ -19,7 +19,9 @@ pub fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Init => init::run(),
 
-        Commands::Create { title, epic } => create::run(create::CreateArgs { title, epic }),
+        Commands::Create { title, epic, body } => {
+            create::run(create::CreateArgs { title, epic, body })
+        }
 
         Commands::Show { id, json } => show::run(show::ShowArgs {
             id,

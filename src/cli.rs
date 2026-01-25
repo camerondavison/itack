@@ -26,6 +26,10 @@ pub enum Commands {
         /// Epic/category for grouping
         #[arg(short, long)]
         epic: Option<String>,
+
+        /// Issue body/description
+        #[arg(short, long)]
+        body: Option<String>,
     },
 
     /// Show issue details
