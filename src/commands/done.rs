@@ -22,7 +22,9 @@ pub fn run(args: DoneArgs) -> Result<()> {
 
     println!(
         "Updated issue #{} status: {} -> {}",
-        args.id, old_status, Status::Done
+        args.id,
+        old_status,
+        Status::Done
     );
 
     Ok(())

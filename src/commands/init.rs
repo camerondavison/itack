@@ -48,7 +48,10 @@ fn repair_database() -> Result<()> {
     // Use open_or_create to ensure directory and DB exist
     let _db = Database::open_or_create(&project.db_path, &project.itack_dir)?;
 
-    println!("Repaired database for project: {}", project.metadata.project_id);
+    println!(
+        "Repaired database for project: {}",
+        project.metadata.project_id
+    );
 
     Ok(())
 }

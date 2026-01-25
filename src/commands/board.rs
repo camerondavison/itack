@@ -30,9 +30,18 @@ pub fn run(args: BoardArgs) -> Result<()> {
 
     let summary = BoardSummary {
         project_id: project.metadata.project_id.clone(),
-        open_count: issues.iter().filter(|i| i.issue.status == Status::Open).count(),
-        in_progress_count: issues.iter().filter(|i| i.issue.status == Status::InProgress).count(),
-        done_count: issues.iter().filter(|i| i.issue.status == Status::Done).count(),
+        open_count: issues
+            .iter()
+            .filter(|i| i.issue.status == Status::Open)
+            .count(),
+        in_progress_count: issues
+            .iter()
+            .filter(|i| i.issue.status == Status::InProgress)
+            .count(),
+        done_count: issues
+            .iter()
+            .filter(|i| i.issue.status == Status::Done)
+            .count(),
         total_count: issues.len(),
     };
 

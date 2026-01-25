@@ -78,7 +78,10 @@ pub fn print_issue_detail(issue: &Issue, body: &str) {
 
     table.add_row(vec![Cell::new("ID"), Cell::new(issue.id)]);
     table.add_row(vec![Cell::new("Title"), Cell::new(&issue.title)]);
-    table.add_row(vec![Cell::new("Status"), Cell::new(issue.status.to_string())]);
+    table.add_row(vec![
+        Cell::new("Status"),
+        Cell::new(issue.status.to_string()),
+    ]);
     table.add_row(vec![
         Cell::new("Epic"),
         Cell::new(issue.epic.as_deref().unwrap_or("-")),
@@ -137,7 +140,10 @@ pub fn print_board(summary: &BoardSummary, issues: &[IssueInfo]) {
 
     table.set_header(vec!["Status", "Count"]);
     table.add_row(vec![Cell::new("Open"), Cell::new(summary.open_count)]);
-    table.add_row(vec![Cell::new("In Progress"), Cell::new(summary.in_progress_count)]);
+    table.add_row(vec![
+        Cell::new("In Progress"),
+        Cell::new(summary.in_progress_count),
+    ]);
     table.add_row(vec![Cell::new("Done"), Cell::new(summary.done_count)]);
     table.add_row(vec![Cell::new("Total"), Cell::new(summary.total_count)]);
 

@@ -84,9 +84,9 @@ impl Database {
         }
 
         // Check version
-        let version: i32 = self
-            .conn
-            .query_row("SELECT version FROM schema_version", [], |row| row.get(0))?;
+        let version: i32 =
+            self.conn
+                .query_row("SELECT version FROM schema_version", [], |row| row.get(0))?;
 
         if version != SCHEMA_VERSION {
             self.rebuild()?;
@@ -130,11 +130,7 @@ impl Database {
 
         // Re-check version inside transaction (double-check locking)
         let version: i32 = tx
-            .query_row(
-                "SELECT version FROM schema_version",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT version FROM schema_version", [], |row| row.get(0))
             .unwrap_or(0);
 
         if version == SCHEMA_VERSION {
@@ -216,11 +212,11 @@ impl Database {
     /// Get the current next_issue_id without incrementing.
     #[allow(dead_code)]
     pub fn peek_next_issue_id(&self) -> Result<u32> {
-        let id: u32 = self
-            .conn
-            .query_row("SELECT next_issue_id FROM state WHERE id = 1", [], |row| {
-                row.get(0)
-            })?;
+        let id: u32 =
+            self.conn
+                .query_row("SELECT next_issue_id FROM state WHERE id = 1", [], |row| {
+                    row.get(0)
+                })?;
         Ok(id)
     }
 
@@ -282,10 +278,9 @@ impl Database {
 
         match result {
             Some((assignee, claimed_at_str)) => {
-                let claimed_at =
-                    DateTime::parse_from_rfc3339(&claimed_at_str).map_err(|e| {
-                        ItackError::Other(format!("Invalid claimed_at timestamp: {}", e))
-                    })?;
+                let claimed_at = DateTime::parse_from_rfc3339(&claimed_at_str).map_err(|e| {
+                    ItackError::Other(format!("Invalid claimed_at timestamp: {}", e))
+                })?;
                 Ok(Some((assignee, claimed_at.with_timezone(&Utc))))
             }
             None => Ok(None),
@@ -310,10 +305,8 @@ impl Database {
         let mut claims = Vec::new();
         for row in rows {
             let (issue_id, assignee, claimed_at_str) = row?;
-            let claimed_at =
-                DateTime::parse_from_rfc3339(&claimed_at_str).map_err(|e| {
-                    ItackError::Other(format!("Invalid claimed_at timestamp: {}", e))
-                })?;
+            let claimed_at = DateTime::parse_from_rfc3339(&claimed_at_str)
+                .map_err(|e| ItackError::Other(format!("Invalid claimed_at timestamp: {}", e)))?;
             claims.push((issue_id, assignee, claimed_at.with_timezone(&Utc)));
         }
 
@@ -356,7 +349,11 @@ pub fn load_all_issues(issues_dir: &Path) -> Result<Vec<IssueInfo>> {
 
     // Sort by status priority, then by ID
     issues.sort_by(|a, b| {
-        let status_cmp = a.issue.status.sort_priority().cmp(&b.issue.status.sort_priority());
+        let status_cmp = a
+            .issue
+            .status
+            .sort_priority()
+            .cmp(&b.issue.status.sort_priority());
         if status_cmp == std::cmp::Ordering::Equal {
             a.issue.id.cmp(&b.issue.id)
         } else {
@@ -409,7 +406,10 @@ mod tests {
 
         // Claim should succeed
         db.claim(1, "agent-1").unwrap();
-        assert_eq!(db.get_claim(1).unwrap().map(|(a, _)| a), Some("agent-1".to_string()));
+        assert_eq!(
+            db.get_claim(1).unwrap().map(|(a, _)| a),
+            Some("agent-1".to_string())
+        );
 
         // Second claim should fail
         let err = db.claim(1, "agent-2").unwrap_err();
@@ -421,7 +421,10 @@ mod tests {
 
         // Now agent-2 can claim
         db.claim(1, "agent-2").unwrap();
-        assert_eq!(db.get_claim(1).unwrap().map(|(a, _)| a), Some("agent-2".to_string()));
+        assert_eq!(
+            db.get_claim(1).unwrap().map(|(a, _)| a),
+            Some("agent-2".to_string())
+        );
     }
 
     #[test]

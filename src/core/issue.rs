@@ -49,7 +49,6 @@ impl Issue {
         issue.epic = epic;
         issue
     }
-
 }
 
 #[cfg(test)]

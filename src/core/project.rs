@@ -64,9 +64,8 @@ impl Project {
 
     /// Get the database path for a project ID.
     fn db_path_for_project(project_id: &str) -> Result<PathBuf> {
-        let global_dir = Config::global_dir().ok_or_else(|| {
-            ItackError::Other("Could not determine home directory".to_string())
-        })?;
+        let global_dir = Config::global_dir()
+            .ok_or_else(|| ItackError::Other("Could not determine home directory".to_string()))?;
 
         Ok(global_dir.join(format!("{}.db", project_id)))
     }
@@ -95,8 +94,8 @@ mod tests {
 
     #[test]
     fn test_is_initialized() {
-        use tempfile::TempDir;
         use std::fs;
+        use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
         assert!(!Project::is_initialized(dir.path()));

@@ -26,7 +26,6 @@ impl Status {
             Status::Done => 2,
         }
     }
-
 }
 
 impl fmt::Display for Status {
@@ -51,7 +50,6 @@ impl FromStr for Status {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
