@@ -20,10 +20,41 @@ pub struct Database {
 
 impl Database {
     /// Open or create the database at the given path.
+    ///
+    /// The parent directory must already exist. Use `open_or_create` if you want
+    /// to create the directory as well.
     pub fn open(db_path: &Path, issues_dir: &Path) -> Result<Self> {
+        // Check parent directory exists - don't auto-create
+        if let Some(parent) = db_path.parent() {
+            if !parent.exists() {
+                return Err(ItackError::DatabaseNotFound(db_path.to_path_buf()));
+            }
+        }
+
         let conn = Connection::open(db_path)?;
 
         // Enable WAL mode for better concurrency
+        conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+
+        let mut db = Database {
+            conn,
+            issues_dir: issues_dir.to_path_buf(),
+        };
+
+        db.ensure_schema()?;
+        Ok(db)
+    }
+
+    /// Open or create the database, creating the parent directory if needed.
+    /// Use this for `init` command only.
+    pub fn open_or_create(db_path: &Path, issues_dir: &Path) -> Result<Self> {
+        if let Some(parent) = db_path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+
+        let conn = Connection::open(db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
 
         let mut db = Database {

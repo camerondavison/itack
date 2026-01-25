@@ -63,7 +63,7 @@ fn test_init_fails_without_git() {
 }
 
 #[test]
-fn test_init_fails_if_already_initialized() {
+fn test_init_repairs_if_already_initialized() {
     let dir = setup_git_repo();
 
     itack()
@@ -72,12 +72,13 @@ fn test_init_fails_if_already_initialized() {
         .assert()
         .success();
 
+    // Running init again should repair/succeed (not fail)
     itack()
         .arg("init")
         .current_dir(dir.path())
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("already initialized"));
+        .success()
+        .stdout(predicate::str::contains("Repaired database"));
 }
 
 #[test]

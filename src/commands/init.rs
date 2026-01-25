@@ -3,15 +3,17 @@
 use std::fs;
 
 use crate::core::{Config, Project};
-use crate::error::{ItackError, Result};
-use crate::storage::Metadata;
+use crate::error::Result;
+use crate::storage::{Database, Metadata};
 
 /// Initialize a new itack project in the current git repository.
+/// If already initialized, repairs/recreates the database.
 pub fn run() -> Result<()> {
     let repo_root = Project::find_repo_root()?;
 
     if Project::is_initialized(&repo_root) {
-        return Err(ItackError::AlreadyInitialized);
+        // Already initialized - repair the database
+        return repair_database();
     }
 
     // Create .itack directory
@@ -29,12 +31,24 @@ pub fn run() -> Result<()> {
     // Initialize global config directory
     Config::init_global()?;
 
-    // Open database to initialize it
+    // Open database to initialize it (use open_or_create for init)
     let project = Project::discover()?;
-    let _db = project.open_db()?;
+    let _db = Database::open_or_create(&project.db_path, &project.itack_dir)?;
 
     println!("Initialized itack project: {}", metadata.project_id);
     println!("Issues will be stored in: .itack/");
+
+    Ok(())
+}
+
+/// Repair/recreate the database for an existing project.
+fn repair_database() -> Result<()> {
+    let project = Project::discover()?;
+
+    // Use open_or_create to ensure directory and DB exist
+    let _db = Database::open_or_create(&project.db_path, &project.itack_dir)?;
+
+    println!("Repaired database for project: {}", project.metadata.project_id);
 
     Ok(())
 }

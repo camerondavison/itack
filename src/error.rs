@@ -22,9 +22,6 @@ pub enum ItackError {
     #[error("Project not initialized. Run 'itack init' first.")]
     NotInitialized,
 
-    #[error("Project already initialized")]
-    AlreadyInitialized,
-
     #[error("Issue {0} not found")]
     IssueNotFound(u32),
 
@@ -33,6 +30,9 @@ pub enum ItackError {
 
     #[error("Issue {0} is not claimed")]
     NotClaimed(u32),
+
+    #[error("Database not found at {0}. Run 'itack init' to fix.")]
+    DatabaseNotFound(std::path::PathBuf),
 
     #[error("Invalid status: {0}. Must be one of: open, in-progress, done")]
     InvalidStatus(String),
