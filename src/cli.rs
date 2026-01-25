@@ -44,14 +44,10 @@ pub enum Commands {
         id: u32,
     },
 
-    /// Update issue status
-    Status {
+    /// Mark issue as done
+    Done {
         /// Issue ID
         id: u32,
-
-        /// New status (open, in-progress, done)
-        #[arg(value_parser = parse_status)]
-        status: Status,
     },
 
     /// Claim an issue for an assignee

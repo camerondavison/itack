@@ -188,7 +188,7 @@ fn test_list_issues() {
 }
 
 #[test]
-fn test_status_update() {
+fn test_done_command() {
     let dir = setup_git_repo();
 
     itack()
@@ -203,28 +203,21 @@ fn test_status_update() {
         .assert()
         .success();
 
-    // Update status
+    // Mark as done
     itack()
-        .args(["status", "1", "in-progress"])
+        .args(["done", "1"])
         .current_dir(dir.path())
         .assert()
         .success()
-        .stdout(predicate::str::contains("open -> in-progress"));
+        .stdout(predicate::str::contains("open -> done"));
 
     // Verify in list
     itack()
-        .args(["list", "--status", "in-progress"])
+        .args(["list", "--status", "done"])
         .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Test issue"));
-
-    // Update to done
-    itack()
-        .args(["status", "1", "done"])
-        .current_dir(dir.path())
-        .assert()
-        .success();
 }
 
 #[test]
@@ -357,7 +350,7 @@ fn test_board_command() {
         .success();
 
     itack()
-        .args(["status", "1", "done"])
+        .args(["done", "1"])
         .current_dir(dir.path())
         .assert()
         .success();
@@ -382,7 +375,7 @@ fn test_board_command() {
 }
 
 #[test]
-fn test_invalid_status() {
+fn test_done_nonexistent_issue() {
     let dir = setup_git_repo();
 
     itack()
@@ -392,16 +385,11 @@ fn test_invalid_status() {
         .success();
 
     itack()
-        .args(["create", "Test issue"])
+        .args(["done", "999"])
         .current_dir(dir.path())
         .assert()
-        .success();
-
-    itack()
-        .args(["status", "1", "invalid-status"])
-        .current_dir(dir.path())
-        .assert()
-        .failure();
+        .failure()
+        .stderr(predicate::str::contains("Issue 999 not found"));
 }
 
 #[test]

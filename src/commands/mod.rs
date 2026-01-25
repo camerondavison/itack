@@ -8,7 +8,7 @@ pub mod init;
 pub mod list;
 pub mod release;
 pub mod show;
-pub mod status;
+pub mod done;
 
 use crate::cli::{Cli, Commands};
 use crate::error::Result;
@@ -34,8 +34,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             edit::run(edit::EditArgs { id })
         }
 
-        Commands::Status { id, status } => {
-            status::run(status::StatusArgs { id, status })
+        Commands::Done { id } => {
+            done::run(done::DoneArgs { id })
         }
 
         Commands::Claim { id, assignee } => {
