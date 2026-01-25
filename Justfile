@@ -17,3 +17,7 @@ check:
     just --fmt --unstable --check
     cargo fmt --check
     cargo clippy -- -D warnings
+
+# Install the binary locally
+install:
+    cargo install --path .
