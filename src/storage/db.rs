@@ -1,4 +1,4 @@
-//! SQLite database: schema, claims, state, rebuild.
+//! SQLite database: schema, claims, state, create/rebuild.
 
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
@@ -79,7 +79,7 @@ impl Database {
             .map(|c| c > 0)?;
 
         if !has_schema {
-            self.create_schema()?;
+            self.create_or_rebuild()?;
             return Ok(());
         }
 
@@ -89,40 +89,14 @@ impl Database {
                 .query_row("SELECT version FROM schema_version", [], |row| row.get(0))?;
 
         if version != SCHEMA_VERSION {
-            self.rebuild()?;
+            self.create_or_rebuild()?;
         }
 
         Ok(())
     }
 
-    /// Create the initial schema.
-    fn create_schema(&mut self) -> Result<()> {
-        self.conn.execute_batch(
-            r#"
-            CREATE TABLE schema_version (
-                version INTEGER NOT NULL
-            );
-
-            CREATE TABLE state (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                next_issue_id INTEGER NOT NULL DEFAULT 1
-            );
-
-            CREATE TABLE claims (
-                issue_id INTEGER PRIMARY KEY,
-                assignee TEXT NOT NULL,
-                claimed_at TEXT NOT NULL
-            );
-
-            INSERT INTO schema_version (version) VALUES (1);
-            INSERT INTO state (id, next_issue_id) VALUES (1, 1);
-            "#,
-        )?;
-        Ok(())
-    }
-
-    /// Rebuild the database from markdown files.
-    pub fn rebuild(&mut self) -> Result<()> {
+    /// Create the schema or rebuild it from markdown files.
+    pub fn create_or_rebuild(&mut self) -> Result<()> {
         // Use EXCLUSIVE transaction for rebuild
         let tx = self
             .conn
