@@ -3,6 +3,7 @@
 pub mod board;
 pub mod claim;
 pub mod create;
+pub mod doctor;
 pub mod done;
 pub mod edit;
 pub mod init;
@@ -63,5 +64,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 OutputFormat::Table
             },
         }),
+
+        Commands::Doctor => doctor::run(),
     }
 }

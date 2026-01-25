@@ -7,7 +7,8 @@ description: >
     (2) Create new issues with titles and descriptions
     (3) Claim issues to work on them
     (4) Mark issues as done when completed
-    (5) Release claimed issues if needed.
+    (5) Release claimed issues if needed
+    (6) Check database health with doctor command.
 allowed-tools: Bash(itack *)
 ---
 
@@ -66,6 +67,13 @@ itack release <id>
 ```bash
 # Open issue in editor
 itack edit <id>
+```
+
+### Diagnose Issues
+
+```bash
+# Check database health and issue synchronization
+itack doctor
 ```
 
 ## Workflow

@@ -184,7 +184,6 @@ impl Database {
     }
 
     /// Get the current next_issue_id without incrementing.
-    #[allow(dead_code)]
     pub fn peek_next_issue_id(&self) -> Result<u32> {
         let id: u32 =
             self.conn
@@ -261,8 +260,15 @@ impl Database {
         }
     }
 
+    /// Get the current schema version from the database.
+    pub fn get_schema_version(&self) -> Result<i32> {
+        let version: i32 =
+            self.conn
+                .query_row("SELECT version FROM schema_version", [], |row| row.get(0))?;
+        Ok(version)
+    }
+
     /// Get all claims.
-    #[allow(dead_code)]
     pub fn list_claims(&self) -> Result<Vec<(u32, String, DateTime<Utc>)>> {
         let mut stmt = self
             .conn

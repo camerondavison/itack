@@ -94,6 +94,9 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Check database health and issue synchronization
+    Doctor,
 }
 
 fn parse_status(s: &str) -> Result<Status, String> {
