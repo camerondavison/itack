@@ -6,6 +6,8 @@ Git-backed issue tracker for multi-agent coordination.
 
 Run `just fix` before committing to format code and fix lints.
 
+When any commands change (added, removed, or modified), update `SKILL.md` to reflect the changes.
+
 ## Working on Branches
 
 To work on a branch, create a git worktree at the parent directory:
