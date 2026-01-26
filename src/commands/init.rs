@@ -48,6 +48,9 @@ fn repair_database() -> Result<()> {
     // Migrate issue filenames to new format before repairing the database
     migrate_issue_filenames(&project)?;
 
+    // Migrate issues to add title headings
+    migrate_title_headings(&project)?;
+
     // Use open_or_create to ensure directory and DB exist
     let mut db = Database::open_or_create(&project.db_path, &project.itack_dir)?;
 
@@ -100,6 +103,31 @@ fn migrate_issue_filenames(project: &Project) -> Result<()> {
             old_path.file_name().unwrap_or_default().to_string_lossy(),
             new_path.file_name().unwrap_or_default().to_string_lossy()
         );
+    }
+
+    Ok(())
+}
+
+/// Migrate issue files to add title headings after frontmatter.
+fn migrate_title_headings(project: &Project) -> Result<()> {
+    if !project.itack_dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(&project.itack_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.extension().map(|e| e == "md").unwrap_or(false) {
+            let content = fs::read_to_string(&path)?;
+            if !markdown::has_title_heading(&content) {
+                // Re-read and re-write to add title heading
+                if let Ok((issue, body)) = markdown::read_issue(&path) {
+                    markdown::write_issue(&path, &issue, &body)?;
+                    println!("Added title heading to issue #{}", issue.id);
+                }
+            }
+        }
     }
 
     Ok(())
