@@ -32,21 +32,41 @@ itack claim <id> <your-name>
 
 This marks the issue as in-progress and locks it so others can't claim it.
 
-## 4. Work on it
+## 4. Create a worktree (optional)
 
-Make your changes. The issue file is at `.itack/<id>.md` if you need to add notes.
+For isolated work, create a git worktree:
 
-## 5. Mark it done
+```bash
+git worktree add ../issue-<id>-<short-description> -b issue-<id>-<short-description>
+```
+
+Then work in that directory.
+
+## 5. Work on it
+
+Make your changes. The issue file is at `.itack/<date>-issue-<id>.md` if you need to add notes.
+
+## 6. Mark it done
 
 ```bash
 itack done <id>
 ```
 
-## 6. Commit your changes
+## 7. Commit your changes
 
 ```bash
 git add <changed-files>
 git commit -m "Description of changes"
+```
+
+## 8. Merge and clean up worktree (if using worktree)
+
+From the main worktree, merge your branch and remove the worktree:
+
+```bash
+cd ../main
+git merge issue-<id>-<short-description>
+git worktree remove ../issue-<id>-<short-description>
 ```
 
 ## Other commands
