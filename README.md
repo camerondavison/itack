@@ -6,7 +6,7 @@ Git-backed issue tracker for multi-agent coordination.
 
 ### Claude Code Skill
 
-To install the steadily-cli skill for Claude Code:
+To install the itack skill for Claude Code:
 
 ```bash
 claude plugin marketplace add camerondavison/itack
