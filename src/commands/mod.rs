@@ -2,6 +2,7 @@
 
 pub mod board;
 pub mod claim;
+pub mod completions;
 pub mod create;
 pub mod doctor;
 pub mod done;
@@ -66,5 +67,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         }),
 
         Commands::Doctor => doctor::run(),
+
+        Commands::Completions { shell } => completions::run(completions::CompletionsArgs { shell }),
     }
 }

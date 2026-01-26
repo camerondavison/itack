@@ -1,6 +1,7 @@
 //! Clap argument definitions.
 
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 
 use crate::core::Status;
 
@@ -97,6 +98,12 @@ pub enum Commands {
 
     /// Check database health and issue synchronization
     Doctor,
+
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        shell: Shell,
+    },
 }
 
 fn parse_status(s: &str) -> Result<Status, String> {
