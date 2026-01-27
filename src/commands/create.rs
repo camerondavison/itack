@@ -1,6 +1,6 @@
 //! itack create command.
 
-use crate::core::{Issue, Project};
+use crate::core::{commit_file, Issue, Project};
 use crate::error::Result;
 use crate::storage::write_issue;
 
@@ -9,6 +9,7 @@ pub struct CreateArgs {
     pub title: String,
     pub epic: Option<String>,
     pub body: Option<String>,
+    pub message: Option<String>,
 }
 
 /// Create a new issue.
@@ -30,6 +31,12 @@ pub fn run(args: CreateArgs) -> Result<()> {
         &args.title,
         args.body.as_deref().unwrap_or(""),
     )?;
+
+    // Auto-commit the new issue
+    let commit_message = args
+        .message
+        .unwrap_or_else(|| format!("Create issue #{}: {}", id, args.title));
+    commit_file(&path, &commit_message)?;
 
     println!("Created issue #{}: {}", id, args.title);
 

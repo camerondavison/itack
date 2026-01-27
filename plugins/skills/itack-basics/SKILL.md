@@ -45,6 +45,8 @@ itack search <query> --all-branches
 
 ### Create Issues
 
+Issues are automatically committed to git when created.
+
 ```bash
 # Create a new issue
 itack create "Issue title"
@@ -54,6 +56,9 @@ itack create "Issue title" --epic "epic-name"
 
 # Create with a body/description
 itack create "Issue title" --body "Detailed description"
+
+# Create with a custom commit message
+itack create "Issue title" --message "Custom commit message"
 ```
 
 ### Work on Issues
@@ -71,9 +76,14 @@ itack release <id>
 
 ### Edit Issues
 
+Issues are automatically committed to git after editing.
+
 ```bash
 # Open issue in editor
 itack edit <id>
+
+# Edit with a custom commit message
+itack edit <id> --message "Custom commit message"
 ```
 
 ### Diagnose Issues
@@ -89,8 +99,7 @@ itack doctor
 2. Run `itack show <id>` to view issue details
 3. Run `itack claim <id> <name>` to claim an issue
 4. Work on the issue
-5. Run `itack done <id>` when complete
-6. Commit your changes with git
+5. Run `itack done <id>` when complete (commit separately with your implementation changes)
 
 ## Important: One Issue at a Time
 

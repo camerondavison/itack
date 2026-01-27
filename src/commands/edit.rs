@@ -2,13 +2,14 @@
 
 use std::process::Command;
 
-use crate::core::Project;
+use crate::core::{commit_file, Project};
 use crate::error::{ItackError, Result};
 use crate::storage::db::load_issue;
 
 /// Arguments for the edit command.
 pub struct EditArgs {
     pub id: u32,
+    pub message: Option<String>,
 }
 
 /// Open an issue in the editor.
@@ -32,6 +33,12 @@ pub fn run(args: EditArgs) -> Result<()> {
             status
         )));
     }
+
+    // Auto-commit the edited issue
+    let commit_message = args
+        .message
+        .unwrap_or_else(|| format!("Edit issue #{}", args.id));
+    commit_file(&path, &commit_message)?;
 
     Ok(())
 }

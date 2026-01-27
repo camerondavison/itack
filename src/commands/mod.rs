@@ -22,9 +22,17 @@ pub fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Init => init::run(),
 
-        Commands::Create { title, epic, body } => {
-            create::run(create::CreateArgs { title, epic, body })
-        }
+        Commands::Create {
+            title,
+            epic,
+            body,
+            message,
+        } => create::run(create::CreateArgs {
+            title,
+            epic,
+            body,
+            message,
+        }),
 
         Commands::Show { id, json } => show::run(show::ShowArgs {
             id,
@@ -35,7 +43,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             },
         }),
 
-        Commands::Edit { id } => edit::run(edit::EditArgs { id }),
+        Commands::Edit { id, message } => edit::run(edit::EditArgs { id, message }),
 
         Commands::Done { id } => done::run(done::DoneArgs { id }),
 

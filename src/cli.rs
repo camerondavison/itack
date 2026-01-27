@@ -31,6 +31,10 @@ pub enum Commands {
         /// Issue body/description
         #[arg(short, long)]
         body: Option<String>,
+
+        /// Custom git commit message (defaults to "Create issue #N: <title>")
+        #[arg(short, long)]
+        message: Option<String>,
     },
 
     /// Show issue details
@@ -47,6 +51,10 @@ pub enum Commands {
     Edit {
         /// Issue ID
         id: u32,
+
+        /// Custom git commit message (defaults to "Edit issue #N")
+        #[arg(short, long)]
+        message: Option<String>,
     },
 
     /// Mark issue as done
