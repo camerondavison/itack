@@ -4,7 +4,7 @@ use std::fs;
 
 use crate::core::{Config, Project};
 use crate::error::Result;
-use crate::storage::{markdown, Database, Metadata};
+use crate::storage::{Database, Metadata, markdown};
 
 /// Initialize a new itack project in the current git repository.
 /// If already initialized, repairs/recreates the database.

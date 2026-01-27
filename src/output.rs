@@ -1,6 +1,6 @@
 //! Table and JSON formatting.
 
-use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, ContentArrangement, Table};
+use comfy_table::{Cell, ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
 use serde::Serialize;
 
 use crate::commands::board::BoardSummary;
@@ -26,7 +26,7 @@ pub fn print_issues_table(issues: &[IssueInfo]) {
     table.load_preset(UTF8_FULL_CONDENSED);
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
-table.set_header(vec![
+    table.set_header(vec![
         "ID",
         "Status",
         "Title",
@@ -54,7 +54,7 @@ table.set_header(vec![
             Cell::new(&info.title),
             Cell::new(issue.epic.as_deref().unwrap_or("-")),
             Cell::new(issue.assignee.as_deref().unwrap_or("-")),
-Cell::new(depends_on),
+            Cell::new(depends_on),
             Cell::new(issue.session.as_deref().unwrap_or("-")),
         ]);
     }
@@ -151,7 +151,7 @@ pub fn print_issue_json(issue: &Issue, title: &str, body: &str) -> Result<()> {
         status: String,
         epic: Option<&'a str>,
         assignee: Option<&'a str>,
-depends_on: &'a [u32],
+        depends_on: &'a [u32],
         session: Option<&'a str>,
         created: String,
         body: &'a str,
@@ -163,7 +163,7 @@ depends_on: &'a [u32],
         status: issue.status.to_string(),
         epic: issue.epic.as_deref(),
         assignee: issue.assignee.as_deref(),
-depends_on: &issue.depends_on,
+        depends_on: &issue.depends_on,
         session: issue.session.as_deref(),
         created: issue.created.to_rfc3339(),
         body,

@@ -5,7 +5,7 @@ use std::fs;
 
 use crate::core::{Project, Status};
 use crate::error::Result;
-use crate::storage::{markdown, Database};
+use crate::storage::{Database, markdown};
 
 /// Expected schema version (must match SCHEMA_VERSION in db.rs).
 const EXPECTED_SCHEMA_VERSION: i32 = 1;
@@ -116,11 +116,10 @@ fn check_title_headings(project: &Project) -> Result<Vec<u32>> {
 
         if path.extension().map(|e| e == "md").unwrap_or(false) {
             let content = fs::read_to_string(&path)?;
-            if !markdown::has_title_heading(&content) {
-                if let Ok((issue, _, _)) = markdown::parse_issue(&content) {
+            if !markdown::has_title_heading(&content)
+                && let Ok((issue, _, _)) = markdown::parse_issue(&content) {
                     missing.push(issue.id);
                 }
-            }
         }
     }
 
@@ -163,12 +162,11 @@ fn check_issue_sync(project: &Project) -> Result<SyncCheckResult> {
             let entry = entry?;
             let path = entry.path();
 
-            if path.extension().map(|e| e == "md").unwrap_or(false) {
-                if let Ok((issue, _, _)) = markdown::read_issue(&path) {
+            if path.extension().map(|e| e == "md").unwrap_or(false)
+                && let Ok((issue, _, _)) = markdown::read_issue(&path) {
                     repo_issues.insert(issue.id);
                     max_repo_id = max_repo_id.max(issue.id);
                 }
-            }
         }
     }
 
@@ -185,13 +183,11 @@ fn check_issue_sync(project: &Project) -> Result<SyncCheckResult> {
         .flatten()
     {
         let path = entry.path();
-        if path.extension().map(|e| e == "md").unwrap_or(false) {
-            if let Ok((issue, _, _)) = markdown::read_issue(&path) {
-                if issue.status == Status::InProgress && !claimed_ids.contains(&issue.id) {
+        if path.extension().map(|e| e == "md").unwrap_or(false)
+            && let Ok((issue, _, _)) = markdown::read_issue(&path)
+                && issue.status == Status::InProgress && !claimed_ids.contains(&issue.id) {
                     missing_claims.push(issue.id);
                 }
-            }
-        }
     }
     missing_claims.sort();
 

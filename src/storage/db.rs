@@ -1,7 +1,7 @@
 //! SQLite database: schema, claims, state, create/rebuild.
 
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use std::fs;
 use std::path::Path;
 
@@ -25,11 +25,10 @@ impl Database {
     /// to create the directory as well.
     pub fn open(db_path: &Path, issues_dir: &Path) -> Result<Self> {
         // Check parent directory exists - don't auto-create
-        if let Some(parent) = db_path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = db_path.parent()
+            && !parent.exists() {
                 return Err(ItackError::DatabaseNotFound(db_path.to_path_buf()));
             }
-        }
 
         let conn = Connection::open(db_path)?;
 
@@ -48,11 +47,10 @@ impl Database {
     /// Open or create the database, creating the parent directory if needed.
     /// Use this for `init` command only.
     pub fn open_or_create(db_path: &Path, issues_dir: &Path) -> Result<Self> {
-        if let Some(parent) = db_path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = db_path.parent()
+            && !parent.exists() {
                 fs::create_dir_all(parent)?;
             }
-        }
 
         let conn = Connection::open(db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
@@ -147,8 +145,8 @@ impl Database {
                 let entry = entry?;
                 let path = entry.path();
 
-                if path.extension().map(|e| e == "md").unwrap_or(false) {
-                    if let Ok((issue, _, _)) = markdown::read_issue(&path) {
+                if path.extension().map(|e| e == "md").unwrap_or(false)
+                    && let Ok((issue, _, _)) = markdown::read_issue(&path) {
                         max_id = max_id.max(issue.id);
 
                         // Rebuild claims from assignee field
@@ -159,7 +157,6 @@ impl Database {
                             )?;
                         }
                     }
-                }
             }
         }
 
@@ -192,8 +189,8 @@ impl Database {
                 let entry = entry?;
                 let path = entry.path();
 
-                if path.extension().map(|e| e == "md").unwrap_or(false) {
-                    if let Ok((issue, _, _)) = markdown::read_issue(&path) {
+                if path.extension().map(|e| e == "md").unwrap_or(false)
+                    && let Ok((issue, _, _)) = markdown::read_issue(&path) {
                         max_id = max_id.max(issue.id);
 
                         // Rebuild claims from assignee field
@@ -204,7 +201,6 @@ impl Database {
                             )?;
                         }
                     }
-                }
             }
         }
 

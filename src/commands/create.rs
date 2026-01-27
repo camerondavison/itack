@@ -1,6 +1,6 @@
 //! itack create command.
 
-use crate::core::{commit_file, Issue, Project};
+use crate::core::{Issue, Project, commit_file};
 use crate::error::Result;
 use crate::storage::write_issue;
 

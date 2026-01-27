@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-use crate::core::{commit_file, Project};
+use crate::core::{Project, commit_file};
 use crate::error::{ItackError, Result};
 use crate::storage::db::load_issue;
 
