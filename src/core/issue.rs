@@ -14,6 +14,10 @@ pub struct Issue {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee: Option<String>,
 
+    /// Branch name where this issue is being worked on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+
     /// Creation timestamp.
     pub created: DateTime<Utc>,
 
@@ -33,6 +37,7 @@ impl Issue {
     pub fn new(id: u32) -> Self {
         Issue {
             assignee: None,
+            branch: None,
             created: Utc::now(),
             epic: None,
             id,

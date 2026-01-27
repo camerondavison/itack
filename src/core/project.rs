@@ -93,6 +93,14 @@ impl Project {
         self.itack_dir
             .join(format!("{}-issue-{:03}.md", date_str, id))
     }
+
+    /// Get the current git branch name.
+    /// Returns None if in a detached HEAD state or if there's no HEAD (unborn branch).
+    pub fn current_branch(&self) -> Option<String> {
+        let repo = Repository::open(&self.repo_root).ok()?;
+        let head = repo.head().ok()?;
+        head.shorthand().map(|s| s.to_string())
+    }
 }
 
 #[cfg(test)]

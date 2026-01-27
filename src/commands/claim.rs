@@ -24,6 +24,7 @@ pub fn run(args: ClaimArgs) -> Result<()> {
 
     // Update markdown file
     issue_info.issue.assignee = Some(args.assignee.clone());
+    issue_info.issue.branch = project.current_branch();
     if issue_info.issue.status == Status::Open {
         issue_info.issue.status = Status::InProgress;
     }
