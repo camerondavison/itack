@@ -1,20 +1,18 @@
 {
-  "name": "itack",
+  "name": "itack-marketplace",
   "metadata": {
-    "description": "Git-backed issue tracker for multi-agent coordination"
+    "description": "Plugins for itack Git-backed issue tracker for multi-agent coordination"
   },
   "owner": {
-    "name": "itack"
+    "name": "Cameron Davison",
+    "email": "cameron.davison+itack@gmail.com"
   },
   "plugins": [
     {
       "name": "itack",
       "description": "itack issue tracker skills",
       "source": "./plugins",
-      "version": "0.1.0",
-      "skills": [
-        "./itack"
-      ]
+      "version": "0.1.0"
     }
   ]
 }

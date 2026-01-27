@@ -1,0 +1,8 @@
+{
+  "name": "itack",
+  "description": "Plugins for itack issue tracker cli tool",
+  "author": {
+    "name": "Cameron Davison",
+    "email": "cameron.davison+itack@gmail.com"
+  }
+}
