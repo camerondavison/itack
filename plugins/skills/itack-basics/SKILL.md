@@ -67,6 +67,9 @@ itack create "Issue title" --message "Custom commit message"
 # Claim an issue (marks as in-progress)
 itack claim <id> <assignee-name>
 
+# Claim with a session ID (e.g., Claude Code session)
+itack claim <id> <assignee-name> --session <session-id>
+
 # Mark an issue as done
 itack done <id>
 

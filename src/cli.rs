@@ -70,6 +70,10 @@ pub enum Commands {
 
         /// Assignee name
         assignee: String,
+
+        /// Session ID (e.g., Claude Code session working on this issue)
+        #[arg(short, long)]
+        session: Option<String>,
     },
 
     /// Release a claimed issue

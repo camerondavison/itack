@@ -24,6 +24,7 @@ pub fn run(args: ReleaseArgs) -> Result<()> {
     // Update markdown file
     let old_assignee = issue_info.issue.assignee.take();
     issue_info.issue.branch = None;
+    issue_info.issue.session = None;
 
     write_issue(
         &issue_info.path,
