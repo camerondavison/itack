@@ -26,13 +26,14 @@ pub fn print_issues_table(issues: &[IssueInfo]) {
     table.load_preset(UTF8_FULL_CONDENSED);
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
-    table.set_header(vec![
+table.set_header(vec![
         "ID",
         "Status",
         "Title",
         "Epic",
         "Assignee",
         "Depends On",
+        "Session",
     ]);
 
     for info in issues {
@@ -53,7 +54,8 @@ pub fn print_issues_table(issues: &[IssueInfo]) {
             Cell::new(&info.title),
             Cell::new(issue.epic.as_deref().unwrap_or("-")),
             Cell::new(issue.assignee.as_deref().unwrap_or("-")),
-            Cell::new(depends_on),
+Cell::new(depends_on),
+            Cell::new(issue.session.as_deref().unwrap_or("-")),
         ]);
     }
 
@@ -69,6 +71,7 @@ pub fn print_issues_json(issues: &[IssueInfo]) -> Result<()> {
         status: String,
         epic: Option<&'a str>,
         assignee: Option<&'a str>,
+        session: Option<&'a str>,
         created: String,
         depends_on: &'a [u32],
     }
@@ -81,6 +84,7 @@ pub fn print_issues_json(issues: &[IssueInfo]) -> Result<()> {
             status: info.issue.status.to_string(),
             epic: info.issue.epic.as_deref(),
             assignee: info.issue.assignee.as_deref(),
+            session: info.issue.session.as_deref(),
             created: info.issue.created.to_rfc3339(),
             depends_on: &info.issue.depends_on,
         })
@@ -122,6 +126,10 @@ pub fn print_issue_detail(issue: &Issue, title: &str, body: &str) {
     };
     table.add_row(vec![Cell::new("Depends On"), Cell::new(depends_on)]);
     table.add_row(vec![
+        Cell::new("Session"),
+        Cell::new(issue.session.as_deref().unwrap_or("-")),
+    ]);
+    table.add_row(vec![
         Cell::new("Created"),
         Cell::new(issue.created.format("%Y-%m-%d %H:%M:%S UTC").to_string()),
     ]);
@@ -143,7 +151,8 @@ pub fn print_issue_json(issue: &Issue, title: &str, body: &str) -> Result<()> {
         status: String,
         epic: Option<&'a str>,
         assignee: Option<&'a str>,
-        depends_on: &'a [u32],
+depends_on: &'a [u32],
+        session: Option<&'a str>,
         created: String,
         body: &'a str,
     }
@@ -154,7 +163,8 @@ pub fn print_issue_json(issue: &Issue, title: &str, body: &str) -> Result<()> {
         status: issue.status.to_string(),
         epic: issue.epic.as_deref(),
         assignee: issue.assignee.as_deref(),
-        depends_on: &issue.depends_on,
+depends_on: &issue.depends_on,
+        session: issue.session.as_deref(),
         created: issue.created.to_rfc3339(),
         body,
     };
@@ -212,6 +222,7 @@ pub fn print_board_json(summary: &BoardSummary, issues: &[IssueInfo]) -> Result<
         status: String,
         epic: Option<&'a str>,
         assignee: Option<&'a str>,
+        session: Option<&'a str>,
     }
 
     let output = BoardOutput {
@@ -230,6 +241,7 @@ pub fn print_board_json(summary: &BoardSummary, issues: &[IssueInfo]) -> Result<
                 status: info.issue.status.to_string(),
                 epic: info.issue.epic.as_deref(),
                 assignee: info.issue.assignee.as_deref(),
+                session: info.issue.session.as_deref(),
             })
             .collect(),
     };

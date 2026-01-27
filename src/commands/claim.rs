@@ -9,6 +9,7 @@ use crate::storage::write_issue;
 pub struct ClaimArgs {
     pub id: u32,
     pub assignee: String,
+    pub session: Option<String>,
 }
 
 /// Claim an issue with SQLite-backed locking.
@@ -25,6 +26,7 @@ pub fn run(args: ClaimArgs) -> Result<()> {
     // Update markdown file
     issue_info.issue.assignee = Some(args.assignee.clone());
     issue_info.issue.branch = project.current_branch();
+    issue_info.issue.session = args.session.clone();
     if issue_info.issue.status == Status::Open {
         issue_info.issue.status = Status::InProgress;
     }

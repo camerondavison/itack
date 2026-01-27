@@ -32,6 +32,10 @@ pub struct Issue {
     /// Unique issue ID.
     pub id: u32,
 
+    /// Session ID (e.g., Claude Code session) working on this issue.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
+
     /// Current status.
     pub status: Status,
 }
@@ -46,6 +50,7 @@ impl Issue {
             depends_on: Vec::new(),
             epic: None,
             id,
+            session: None,
             status: Status::default(),
         }
     }

@@ -47,7 +47,15 @@ pub fn dispatch(cli: Cli) -> Result<()> {
 
         Commands::Done { id } => done::run(done::DoneArgs { id }),
 
-        Commands::Claim { id, assignee } => claim::run(claim::ClaimArgs { id, assignee }),
+        Commands::Claim {
+            id,
+            assignee,
+            session,
+        } => claim::run(claim::ClaimArgs {
+            id,
+            assignee,
+            session,
+        }),
 
         Commands::Release { id } => release::run(release::ReleaseArgs { id }),
 
