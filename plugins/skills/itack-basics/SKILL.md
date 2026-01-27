@@ -91,3 +91,7 @@ itack doctor
 4. Work on the issue
 5. Run `itack done <id>` when complete
 6. Commit your changes with git
+
+## Important: One Issue at a Time
+
+Only claim and work on one issue at a time. If an issue is not claimed, assume someone else is working on it or will pick it up. Do not claim multiple issues simultaneously.
