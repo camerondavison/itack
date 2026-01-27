@@ -21,6 +21,10 @@ pub struct Issue {
     /// Creation timestamp.
     pub created: DateTime<Utc>,
 
+    /// Issue IDs that this issue depends on (must be completed first).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<u32>,
+
     /// Epic/category for grouping issues.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epic: Option<String>,
@@ -39,6 +43,7 @@ impl Issue {
             assignee: None,
             branch: None,
             created: Utc::now(),
+            depends_on: Vec::new(),
             epic: None,
             id,
             status: Status::default(),

@@ -26,16 +26,34 @@ pub fn print_issues_table(issues: &[IssueInfo]) {
     table.load_preset(UTF8_FULL_CONDENSED);
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
-    table.set_header(vec!["ID", "Status", "Title", "Epic", "Assignee"]);
+    table.set_header(vec![
+        "ID",
+        "Status",
+        "Title",
+        "Epic",
+        "Assignee",
+        "Depends On",
+    ]);
 
     for info in issues {
         let issue = &info.issue;
+        let depends_on = if issue.depends_on.is_empty() {
+            "-".to_string()
+        } else {
+            issue
+                .depends_on
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
         table.add_row(vec![
             Cell::new(issue.id),
             Cell::new(issue.status.to_string()),
             Cell::new(&info.title),
             Cell::new(issue.epic.as_deref().unwrap_or("-")),
             Cell::new(issue.assignee.as_deref().unwrap_or("-")),
+            Cell::new(depends_on),
         ]);
     }
 
@@ -52,6 +70,7 @@ pub fn print_issues_json(issues: &[IssueInfo]) -> Result<()> {
         epic: Option<&'a str>,
         assignee: Option<&'a str>,
         created: String,
+        depends_on: &'a [u32],
     }
 
     let output: Vec<IssueOutput> = issues
@@ -63,6 +82,7 @@ pub fn print_issues_json(issues: &[IssueInfo]) -> Result<()> {
             epic: info.issue.epic.as_deref(),
             assignee: info.issue.assignee.as_deref(),
             created: info.issue.created.to_rfc3339(),
+            depends_on: &info.issue.depends_on,
         })
         .collect();
 
@@ -90,6 +110,17 @@ pub fn print_issue_detail(issue: &Issue, title: &str, body: &str) {
         Cell::new("Assignee"),
         Cell::new(issue.assignee.as_deref().unwrap_or("-")),
     ]);
+    let depends_on = if issue.depends_on.is_empty() {
+        "-".to_string()
+    } else {
+        issue
+            .depends_on
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    table.add_row(vec![Cell::new("Depends On"), Cell::new(depends_on)]);
     table.add_row(vec![
         Cell::new("Created"),
         Cell::new(issue.created.format("%Y-%m-%d %H:%M:%S UTC").to_string()),
@@ -112,6 +143,7 @@ pub fn print_issue_json(issue: &Issue, title: &str, body: &str) -> Result<()> {
         status: String,
         epic: Option<&'a str>,
         assignee: Option<&'a str>,
+        depends_on: &'a [u32],
         created: String,
         body: &'a str,
     }
@@ -122,6 +154,7 @@ pub fn print_issue_json(issue: &Issue, title: &str, body: &str) -> Result<()> {
         status: issue.status.to_string(),
         epic: issue.epic.as_deref(),
         assignee: issue.assignee.as_deref(),
+        depends_on: &issue.depends_on,
         created: issue.created.to_rfc3339(),
         body,
     };
