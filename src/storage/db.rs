@@ -148,7 +148,7 @@ impl Database {
                 let path = entry.path();
 
                 if path.extension().map(|e| e == "md").unwrap_or(false) {
-                    if let Ok((issue, _)) = markdown::read_issue(&path) {
+                    if let Ok((issue, _, _)) = markdown::read_issue(&path) {
                         max_id = max_id.max(issue.id);
 
                         // Rebuild claims from assignee field
@@ -193,7 +193,7 @@ impl Database {
                 let path = entry.path();
 
                 if path.extension().map(|e| e == "md").unwrap_or(false) {
-                    if let Ok((issue, _)) = markdown::read_issue(&path) {
+                    if let Ok((issue, _, _)) = markdown::read_issue(&path) {
                         max_id = max_id.max(issue.id);
 
                         // Rebuild claims from assignee field
@@ -343,6 +343,7 @@ impl Database {
 #[derive(Clone)]
 pub struct IssueInfo {
     pub issue: Issue,
+    pub title: String,
     pub body: String,
     pub path: std::path::PathBuf,
 }
@@ -361,8 +362,13 @@ pub fn load_all_issues(issues_dir: &Path) -> Result<Vec<IssueInfo>> {
 
         if path.extension().map(|e| e == "md").unwrap_or(false) {
             match markdown::read_issue(&path) {
-                Ok((issue, body)) => {
-                    issues.push(IssueInfo { issue, body, path });
+                Ok((issue, title, body)) => {
+                    issues.push(IssueInfo {
+                        issue,
+                        title,
+                        body,
+                        path,
+                    });
                 }
                 Err(_) => {
                     // Skip invalid files
@@ -400,8 +406,13 @@ pub fn load_issue(issues_dir: &Path, id: u32) -> Result<IssueInfo> {
             let filename_str = filename.to_string_lossy();
             if filename_str.ends_with(&suffix) {
                 let path = entry.path();
-                let (issue, body) = markdown::read_issue(&path)?;
-                return Ok(IssueInfo { issue, body, path });
+                let (issue, title, body) = markdown::read_issue(&path)?;
+                return Ok(IssueInfo {
+                    issue,
+                    title,
+                    body,
+                    path,
+                });
             }
         }
     }
@@ -412,8 +423,13 @@ pub fn load_issue(issues_dir: &Path, id: u32) -> Result<IssueInfo> {
         return Err(ItackError::IssueNotFound(id));
     }
 
-    let (issue, body) = markdown::read_issue(&path)?;
-    Ok(IssueInfo { issue, body, path })
+    let (issue, title, body) = markdown::read_issue(&path)?;
+    Ok(IssueInfo {
+        issue,
+        title,
+        body,
+        path,
+    })
 }
 
 #[cfg(test)]

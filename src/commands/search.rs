@@ -29,7 +29,7 @@ pub fn run(args: SearchArgs) -> Result<()> {
         let matching: Vec<_> = issues
             .into_iter()
             .filter(|info| {
-                info.issue.title.to_lowercase().contains(&query_lower)
+                info.title.to_lowercase().contains(&query_lower)
                     || info.body.to_lowercase().contains(&query_lower)
             })
             .collect();

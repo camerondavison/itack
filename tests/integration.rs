@@ -487,12 +487,17 @@ fn test_markdown_file_format() {
         find_issue_file(&env.path().join(".itack"), 1).expect("Issue file should exist");
     let content = fs::read_to_string(&issue_file).unwrap();
 
-    // Check YAML front matter format
+    // Check YAML front matter format (title is NOT in YAML, it's in markdown body)
     assert!(content.starts_with("---\n"));
     assert!(content.contains("id: 1"));
-    assert!(content.contains("title: Test issue"));
+    assert!(
+        !content.contains("title:"),
+        "Title should not be in YAML front matter"
+    );
     assert!(content.contains("epic: MVP"));
     assert!(content.contains("status: open"));
+    // Title should be in markdown body as H1 heading
+    assert!(content.contains("# Test issue"));
 
     // Check filename format (YYYY-MM-DD-issue-001.md)
     let filename = issue_file.file_name().unwrap().to_string_lossy();

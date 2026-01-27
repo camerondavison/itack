@@ -9,7 +9,8 @@ use crate::error::{ItackError, Result};
 const FRONT_MATTER_DELIMITER: &str = "---";
 
 /// Parse an issue from a markdown file with YAML front matter.
-pub fn parse_issue(content: &str) -> Result<(Issue, String)> {
+/// Returns the issue, title (from H1 heading), and body (without title heading).
+pub fn parse_issue(content: &str) -> Result<(Issue, String, String)> {
     let content = content.trim_start();
 
     if !content.starts_with(FRONT_MATTER_DELIMITER) {
@@ -31,19 +32,24 @@ pub fn parse_issue(content: &str) -> Result<(Issue, String)> {
 
     let issue: Issue = serde_yaml::from_str(yaml_content)?;
 
-    // Strip the title heading from body if present (since we write it automatically)
-    let body = strip_title_heading(&body, &issue.title);
+    // Extract the title from H1 heading
+    let (title, body) = extract_title_heading(&body)?;
 
-    Ok((issue, body))
+    Ok((issue, title, body))
 }
 
-/// Strip the title heading from the body if it matches the issue title.
-fn strip_title_heading(body: &str, title: &str) -> String {
-    let expected_heading = format!("# {}", title);
-    if let Some(rest) = body.strip_prefix(&expected_heading) {
-        rest.trim_start_matches('\n').to_string()
+/// Extract the title from the H1 heading and return (title, remaining body).
+fn extract_title_heading(body: &str) -> Result<(String, String)> {
+    if let Some(rest) = body.strip_prefix("# ") {
+        // Find end of line
+        let newline_pos = rest.find('\n').unwrap_or(rest.len());
+        let title = rest[..newline_pos].to_string();
+        let remaining = rest[newline_pos..].trim_start_matches('\n').to_string();
+        Ok((title, remaining))
     } else {
-        body.to_string()
+        Err(ItackError::InvalidMarkdown(
+            "Missing title heading (# Title)".to_string(),
+        ))
     }
 }
 
@@ -66,7 +72,8 @@ pub fn has_title_heading(content: &str) -> bool {
 }
 
 /// Format an issue as markdown with YAML front matter.
-pub fn format_issue(issue: &Issue, body: &str) -> Result<String> {
+/// The title is stored as an H1 heading in the body, not in YAML.
+pub fn format_issue(issue: &Issue, title: &str, body: &str) -> Result<String> {
     let yaml = serde_yaml::to_string(issue)?;
     let mut result = String::new();
     result.push_str(FRONT_MATTER_DELIMITER);
@@ -74,10 +81,10 @@ pub fn format_issue(issue: &Issue, body: &str) -> Result<String> {
     result.push_str(&yaml);
     result.push_str(FRONT_MATTER_DELIMITER);
     result.push('\n');
-    // Add title as H1 heading so it's visible in markdown viewers like glow
+    // Add title as H1 heading (this is the canonical location for the title)
     result.push('\n');
     result.push_str("# ");
-    result.push_str(&issue.title);
+    result.push_str(title);
     result.push('\n');
     if !body.is_empty() {
         result.push('\n');
@@ -90,14 +97,15 @@ pub fn format_issue(issue: &Issue, body: &str) -> Result<String> {
 }
 
 /// Read an issue from a markdown file.
-pub fn read_issue(path: &Path) -> Result<(Issue, String)> {
+/// Returns the issue, title, and body.
+pub fn read_issue(path: &Path) -> Result<(Issue, String, String)> {
     let content = fs::read_to_string(path)?;
     parse_issue(&content)
 }
 
 /// Write an issue to a markdown file.
-pub fn write_issue(path: &Path, issue: &Issue, body: &str) -> Result<()> {
-    let content = format_issue(issue, body)?;
+pub fn write_issue(path: &Path, issue: &Issue, title: &str, body: &str) -> Result<()> {
+    let content = format_issue(issue, title, body)?;
     fs::write(path, content)?;
     Ok(())
 }
@@ -115,28 +123,6 @@ assignee: agent-1
 created: 2024-01-15T10:30:00Z
 id: 1
 status: open
-title: Test issue
----
-
-This is the body.
-"#;
-
-        let (issue, body) = parse_issue(content).unwrap();
-        assert_eq!(issue.id, 1);
-        assert_eq!(issue.title, "Test issue");
-        assert_eq!(issue.status, Status::Open);
-        assert_eq!(issue.assignee, Some("agent-1".to_string()));
-        assert_eq!(body, "This is the body.\n");
-    }
-
-    #[test]
-    fn test_parse_issue_strips_title_heading() {
-        let content = r#"---
-assignee: agent-1
-created: 2024-01-15T10:30:00Z
-id: 1
-status: open
-title: Test issue
 ---
 
 # Test issue
@@ -144,21 +130,41 @@ title: Test issue
 This is the body.
 "#;
 
-        let (issue, body) = parse_issue(content).unwrap();
+        let (issue, title, body) = parse_issue(content).unwrap();
         assert_eq!(issue.id, 1);
-        assert_eq!(issue.title, "Test issue");
+        assert_eq!(title, "Test issue");
+        assert_eq!(issue.status, Status::Open);
+        assert_eq!(issue.assignee, Some("agent-1".to_string()));
         assert_eq!(body, "This is the body.\n");
     }
 
     #[test]
+    fn test_parse_issue_no_body() {
+        let content = r#"---
+created: 2024-01-15T10:30:00Z
+id: 1
+status: open
+---
+
+# Just a title
+"#;
+
+        let (issue, title, body) = parse_issue(content).unwrap();
+        assert_eq!(issue.id, 1);
+        assert_eq!(title, "Just a title");
+        assert_eq!(body, "");
+    }
+
+    #[test]
     fn test_format_issue() {
-        let issue = Issue::new(1, "Test issue".to_string());
+        let issue = Issue::new(1);
+        let title = "Test issue";
         let body = "This is the body.";
 
-        let formatted = format_issue(&issue, body).unwrap();
+        let formatted = format_issue(&issue, title, body).unwrap();
         assert!(formatted.starts_with("---\n"));
         assert!(formatted.contains("id: 1"));
-        assert!(formatted.contains("title: Test issue"));
+        assert!(!formatted.contains("title:")); // Title should NOT be in YAML
         assert!(formatted.contains("status: open"));
         assert!(formatted.contains("\n# Test issue\n"));
         assert!(formatted.ends_with("This is the body.\n"));
@@ -169,15 +175,16 @@ This is the body.
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("1.md");
 
-        let mut issue = Issue::new(1, "Test issue".to_string());
+        let mut issue = Issue::new(1);
         issue.epic = Some("MVP".to_string());
+        let title = "Test issue";
         let body = "Description here.";
 
-        write_issue(&path, &issue, body).unwrap();
-        let (loaded, loaded_body) = read_issue(&path).unwrap();
+        write_issue(&path, &issue, title, body).unwrap();
+        let (loaded, loaded_title, loaded_body) = read_issue(&path).unwrap();
 
         assert_eq!(loaded.id, issue.id);
-        assert_eq!(loaded.title, issue.title);
+        assert_eq!(loaded_title, title);
         assert_eq!(loaded.epic, issue.epic);
         assert_eq!(loaded_body.trim(), body);
     }
@@ -186,5 +193,18 @@ This is the body.
     fn test_invalid_markdown() {
         assert!(parse_issue("no front matter").is_err());
         assert!(parse_issue("---\nunclosed").is_err());
+    }
+
+    #[test]
+    fn test_missing_title_heading() {
+        let content = r#"---
+created: 2024-01-15T10:30:00Z
+id: 1
+status: open
+---
+
+No H1 heading here.
+"#;
+        assert!(parse_issue(content).is_err());
     }
 }

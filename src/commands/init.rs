@@ -83,10 +83,10 @@ fn migrate_issue_filenames(project: &Project) -> Result<()> {
             // Check if it's old format (just a number) or already new format
             if filename.parse::<u32>().is_ok() {
                 // Old format - needs migration
-                if let Ok((issue, body)) = markdown::read_issue(&path) {
+                if let Ok((issue, title, body)) = markdown::read_issue(&path) {
                     let new_path = project.issue_path_with_date(issue.id, &issue.created);
                     if new_path != path {
-                        files_to_rename.push((path, new_path, issue, body));
+                        files_to_rename.push((path, new_path, issue, title, body));
                     }
                 }
             }
@@ -94,9 +94,9 @@ fn migrate_issue_filenames(project: &Project) -> Result<()> {
     }
 
     // Rename files
-    for (old_path, new_path, issue, body) in files_to_rename {
+    for (old_path, new_path, issue, title, body) in files_to_rename {
         // Write to new path first, then delete old
-        markdown::write_issue(&new_path, &issue, &body)?;
+        markdown::write_issue(&new_path, &issue, &title, &body)?;
         fs::remove_file(&old_path)?;
         println!(
             "Migrated: {} -> {}",
@@ -109,6 +109,7 @@ fn migrate_issue_filenames(project: &Project) -> Result<()> {
 }
 
 /// Migrate issue files to add title headings after frontmatter.
+/// Also removes title from YAML front matter if present.
 fn migrate_title_headings(project: &Project) -> Result<()> {
     if !project.itack_dir.exists() {
         return Ok(());
@@ -120,15 +121,73 @@ fn migrate_title_headings(project: &Project) -> Result<()> {
 
         if path.extension().map(|e| e == "md").unwrap_or(false) {
             let content = fs::read_to_string(&path)?;
-            if !markdown::has_title_heading(&content) {
-                // Re-read and re-write to add title heading
-                if let Ok((issue, body)) = markdown::read_issue(&path) {
-                    markdown::write_issue(&path, &issue, &body)?;
-                    println!("Added title heading to issue #{}", issue.id);
+
+            // Check if file needs migration (has title in YAML or missing title heading)
+            let needs_migration =
+                content.contains("\ntitle:") || !markdown::has_title_heading(&content);
+
+            if needs_migration {
+                // Try to read with old format (title in YAML)
+                if let Some((issue, title, body)) = try_read_old_format(&content) {
+                    markdown::write_issue(&path, &issue, &title, &body)?;
+                    println!("Migrated issue #{} (removed title from YAML)", issue.id);
+                } else if let Ok((issue, title, body)) = markdown::read_issue(&path) {
+                    // Already in new format, just re-write to ensure consistency
+                    markdown::write_issue(&path, &issue, &title, &body)?;
                 }
             }
         }
     }
 
     Ok(())
+}
+
+/// Try to read an issue file in the old format (with title in YAML).
+/// Returns None if the file doesn't have the old format.
+fn try_read_old_format(content: &str) -> Option<(crate::core::Issue, String, String)> {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct OldIssue {
+        #[serde(default)]
+        assignee: Option<String>,
+        created: chrono::DateTime<chrono::Utc>,
+        #[serde(default)]
+        epic: Option<String>,
+        id: u32,
+        status: crate::core::Status,
+        title: String, // Old format has title in YAML
+    }
+
+    let content = content.trim_start();
+    if !content.starts_with("---") {
+        return None;
+    }
+
+    let after_first = &content[3..];
+    let end_pos = after_first.find("---")?;
+
+    let yaml_content = &after_first[..end_pos];
+    let body_start = 3 + end_pos + 3;
+    let body = content[body_start..].trim_start_matches('\n');
+
+    // Try to parse as old format
+    let old_issue: OldIssue = serde_yaml::from_str(yaml_content).ok()?;
+
+    // Convert to new Issue format
+    let mut issue = crate::core::Issue::new(old_issue.id);
+    issue.assignee = old_issue.assignee;
+    issue.created = old_issue.created;
+    issue.epic = old_issue.epic;
+    issue.status = old_issue.status;
+
+    // Extract body (strip title heading if present)
+    let expected_heading = format!("# {}", old_issue.title);
+    let body = if let Some(rest) = body.strip_prefix(&expected_heading) {
+        rest.trim_start_matches('\n').to_string()
+    } else {
+        body.to_string()
+    };
+
+    Some((issue, old_issue.title, body))
 }

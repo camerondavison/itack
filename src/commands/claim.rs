@@ -28,7 +28,12 @@ pub fn run(args: ClaimArgs) -> Result<()> {
         issue_info.issue.status = Status::InProgress;
     }
 
-    write_issue(&issue_info.path, &issue_info.issue, &issue_info.body)?;
+    write_issue(
+        &issue_info.path,
+        &issue_info.issue,
+        &issue_info.title,
+        &issue_info.body,
+    )?;
 
     println!("Claimed issue #{} for {}", args.id, args.assignee);
 

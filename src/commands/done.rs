@@ -18,7 +18,12 @@ pub fn run(args: DoneArgs) -> Result<()> {
     let old_status = issue_info.issue.status;
     issue_info.issue.status = Status::Done;
 
-    write_issue(&issue_info.path, &issue_info.issue, &issue_info.body)?;
+    write_issue(
+        &issue_info.path,
+        &issue_info.issue,
+        &issue_info.title,
+        &issue_info.body,
+    )?;
 
     println!(
         "Updated issue #{} status: {} -> {}",

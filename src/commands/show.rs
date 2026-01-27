@@ -18,10 +18,10 @@ pub fn run(args: ShowArgs) -> Result<()> {
 
     match args.format {
         OutputFormat::Table => {
-            output::print_issue_detail(&issue_info.issue, &issue_info.body);
+            output::print_issue_detail(&issue_info.issue, &issue_info.title, &issue_info.body);
         }
         OutputFormat::Json => {
-            output::print_issue_json(&issue_info.issue, &issue_info.body)?;
+            output::print_issue_json(&issue_info.issue, &issue_info.title, &issue_info.body)?;
         }
     }
 

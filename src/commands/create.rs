@@ -19,12 +19,17 @@ pub fn run(args: CreateArgs) -> Result<()> {
     // Get next issue ID atomically
     let id = db.next_issue_id()?;
 
-    // Create the issue
-    let issue = Issue::with_epic(id, args.title.clone(), args.epic);
+    // Create the issue (title is stored in markdown, not in Issue struct)
+    let issue = Issue::with_epic(id, args.epic);
 
     // Write to markdown file (use new filename format with date)
     let path = project.issue_path_with_date(id, &issue.created);
-    write_issue(&path, &issue, args.body.as_deref().unwrap_or(""))?;
+    write_issue(
+        &path,
+        &issue,
+        &args.title,
+        args.body.as_deref().unwrap_or(""),
+    )?;
 
     println!("Created issue #{}: {}", id, args.title);
 

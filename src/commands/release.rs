@@ -24,7 +24,12 @@ pub fn run(args: ReleaseArgs) -> Result<()> {
     // Update markdown file
     let old_assignee = issue_info.issue.assignee.take();
 
-    write_issue(&issue_info.path, &issue_info.issue, &issue_info.body)?;
+    write_issue(
+        &issue_info.path,
+        &issue_info.issue,
+        &issue_info.title,
+        &issue_info.body,
+    )?;
 
     if let Some(assignee) = old_assignee {
         println!("Released issue #{} from {}", args.id, assignee);

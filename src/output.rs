@@ -33,7 +33,7 @@ pub fn print_issues_table(issues: &[IssueInfo]) {
         table.add_row(vec![
             Cell::new(issue.id),
             Cell::new(issue.status.to_string()),
-            Cell::new(&issue.title),
+            Cell::new(&info.title),
             Cell::new(issue.epic.as_deref().unwrap_or("-")),
             Cell::new(issue.assignee.as_deref().unwrap_or("-")),
         ]);
@@ -58,7 +58,7 @@ pub fn print_issues_json(issues: &[IssueInfo]) -> Result<()> {
         .iter()
         .map(|info| IssueOutput {
             id: info.issue.id,
-            title: &info.issue.title,
+            title: &info.title,
             status: info.issue.status.to_string(),
             epic: info.issue.epic.as_deref(),
             assignee: info.issue.assignee.as_deref(),
@@ -71,13 +71,13 @@ pub fn print_issues_json(issues: &[IssueInfo]) -> Result<()> {
 }
 
 /// Print issue detail as a table.
-pub fn print_issue_detail(issue: &Issue, body: &str) {
+pub fn print_issue_detail(issue: &Issue, title: &str, body: &str) {
     let mut table = Table::new();
     table.load_preset(UTF8_FULL_CONDENSED);
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
     table.add_row(vec![Cell::new("ID"), Cell::new(issue.id)]);
-    table.add_row(vec![Cell::new("Title"), Cell::new(&issue.title)]);
+    table.add_row(vec![Cell::new("Title"), Cell::new(title)]);
     table.add_row(vec![
         Cell::new("Status"),
         Cell::new(issue.status.to_string()),
@@ -104,7 +104,7 @@ pub fn print_issue_detail(issue: &Issue, body: &str) {
 }
 
 /// Print issue detail as JSON.
-pub fn print_issue_json(issue: &Issue, body: &str) -> Result<()> {
+pub fn print_issue_json(issue: &Issue, title: &str, body: &str) -> Result<()> {
     #[derive(Serialize)]
     struct IssueDetail<'a> {
         id: u32,
@@ -118,7 +118,7 @@ pub fn print_issue_json(issue: &Issue, body: &str) -> Result<()> {
 
     let output = IssueDetail {
         id: issue.id,
-        title: &issue.title,
+        title,
         status: issue.status.to_string(),
         epic: issue.epic.as_deref(),
         assignee: issue.assignee.as_deref(),
@@ -193,7 +193,7 @@ pub fn print_board_json(summary: &BoardSummary, issues: &[IssueInfo]) -> Result<
             .iter()
             .map(|info| IssueOutput {
                 id: info.issue.id,
-                title: &info.issue.title,
+                title: &info.title,
                 status: info.issue.status.to_string(),
                 epic: info.issue.epic.as_deref(),
                 assignee: info.issue.assignee.as_deref(),
