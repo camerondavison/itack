@@ -99,6 +99,20 @@ pub enum Commands {
     /// Check database health and issue synchronization
     Doctor,
 
+    /// Search for issues by query
+    Search {
+        /// Search query
+        query: String,
+
+        /// Search across all git branches (uses git grep)
+        #[arg(short, long)]
+        all_branches: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for

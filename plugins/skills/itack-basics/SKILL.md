@@ -8,7 +8,8 @@ description: >
     (3) Claim issues to work on them
     (4) Mark issues as done when completed
     (5) Release claimed issues if needed
-    (6) Check database health with doctor command.
+    (6) Check database health with doctor command
+    (7) Search issues by query.
 allowed-tools: Bash(itack *)
 ---
 
@@ -34,6 +35,12 @@ itack list --status done
 
 # Show details of a specific issue
 itack show <id>
+
+# Search issues by title or body
+itack search <query>
+
+# Search across all git branches
+itack search <query> --all-branches
 ```
 
 ### Create Issues

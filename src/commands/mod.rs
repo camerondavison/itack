@@ -10,6 +10,7 @@ pub mod edit;
 pub mod init;
 pub mod list;
 pub mod release;
+pub mod search;
 pub mod show;
 
 use crate::cli::{Cli, Commands};
@@ -67,6 +68,20 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         }),
 
         Commands::Doctor => doctor::run(),
+
+        Commands::Search {
+            query,
+            all_branches,
+            json,
+        } => search::run(search::SearchArgs {
+            query,
+            all_branches,
+            format: if json {
+                OutputFormat::Json
+            } else {
+                OutputFormat::Table
+            },
+        }),
 
         Commands::Completions { shell } => completions::run(completions::CompletionsArgs { shell }),
     }
