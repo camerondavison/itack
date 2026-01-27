@@ -10,5 +10,5 @@ To install the itack skill for Claude Code:
 
 ```bash
 claude plugin marketplace add camerondavison/itack
-claude plugin install itack@itack
+claude plugin install itack@itack-marketplace
 ```
