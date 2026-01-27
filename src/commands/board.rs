@@ -16,6 +16,7 @@ pub struct BoardSummary {
     pub open_count: usize,
     pub in_progress_count: usize,
     pub done_count: usize,
+    pub wontfix_count: usize,
     pub total_count: usize,
 }
 
@@ -41,6 +42,10 @@ pub fn run(args: BoardArgs) -> Result<()> {
         done_count: issues
             .iter()
             .filter(|i| i.issue.status == Status::Done)
+            .count(),
+        wontfix_count: issues
+            .iter()
+            .filter(|i| i.issue.status == Status::WontFix)
             .count(),
         total_count: issues.len(),
     };

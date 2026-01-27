@@ -32,6 +32,7 @@ itack list
 itack list --status open
 itack list --status in-progress
 itack list --status done
+itack list --status wontfix
 
 # Show details of a specific issue
 itack show <id>

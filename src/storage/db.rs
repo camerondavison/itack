@@ -26,9 +26,10 @@ impl Database {
     pub fn open(db_path: &Path, issues_dir: &Path) -> Result<Self> {
         // Check parent directory exists - don't auto-create
         if let Some(parent) = db_path.parent()
-            && !parent.exists() {
-                return Err(ItackError::DatabaseNotFound(db_path.to_path_buf()));
-            }
+            && !parent.exists()
+        {
+            return Err(ItackError::DatabaseNotFound(db_path.to_path_buf()));
+        }
 
         let conn = Connection::open(db_path)?;
 
@@ -48,9 +49,10 @@ impl Database {
     /// Use this for `init` command only.
     pub fn open_or_create(db_path: &Path, issues_dir: &Path) -> Result<Self> {
         if let Some(parent) = db_path.parent()
-            && !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent)?;
+        }
 
         let conn = Connection::open(db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
@@ -146,17 +148,18 @@ impl Database {
                 let path = entry.path();
 
                 if path.extension().map(|e| e == "md").unwrap_or(false)
-                    && let Ok((issue, _, _)) = markdown::read_issue(&path) {
-                        max_id = max_id.max(issue.id);
+                    && let Ok((issue, _, _)) = markdown::read_issue(&path)
+                {
+                    max_id = max_id.max(issue.id);
 
-                        // Rebuild claims from assignee field
-                        if let Some(assignee) = &issue.assignee {
-                            tx.execute(
+                    // Rebuild claims from assignee field
+                    if let Some(assignee) = &issue.assignee {
+                        tx.execute(
                                 "INSERT OR REPLACE INTO claims (issue_id, assignee, claimed_at) VALUES (?1, ?2, ?3)",
                                 params![issue.id, assignee, issue.created.to_rfc3339()],
                             )?;
-                        }
                     }
+                }
             }
         }
 
@@ -190,17 +193,18 @@ impl Database {
                 let path = entry.path();
 
                 if path.extension().map(|e| e == "md").unwrap_or(false)
-                    && let Ok((issue, _, _)) = markdown::read_issue(&path) {
-                        max_id = max_id.max(issue.id);
+                    && let Ok((issue, _, _)) = markdown::read_issue(&path)
+                {
+                    max_id = max_id.max(issue.id);
 
-                        // Rebuild claims from assignee field
-                        if let Some(assignee) = &issue.assignee {
-                            tx.execute(
+                    // Rebuild claims from assignee field
+                    if let Some(assignee) = &issue.assignee {
+                        tx.execute(
                                 "INSERT OR REPLACE INTO claims (issue_id, assignee, claimed_at) VALUES (?1, ?2, ?3)",
                                 params![issue.id, assignee, issue.created.to_rfc3339()],
                             )?;
-                        }
                     }
+                }
             }
         }
 

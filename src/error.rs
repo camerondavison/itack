@@ -37,7 +37,7 @@ pub enum ItackError {
     #[error("Database not found at {0}. Run 'itack init' to fix.")]
     DatabaseNotFound(std::path::PathBuf),
 
-    #[error("Invalid status: {0}. Must be one of: open, in-progress, done")]
+    #[error("Invalid status: {0}. Must be one of: open, in-progress, done, wontfix")]
     InvalidStatus(String),
 
     #[error("Database error: {0}")]

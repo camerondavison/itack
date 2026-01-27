@@ -188,6 +188,10 @@ pub fn print_board(summary: &BoardSummary, issues: &[IssueInfo]) {
         Cell::new(summary.in_progress_count),
     ]);
     table.add_row(vec![Cell::new("Done"), Cell::new(summary.done_count)]);
+    table.add_row(vec![
+        Cell::new("Won't Fix"),
+        Cell::new(summary.wontfix_count),
+    ]);
     table.add_row(vec![Cell::new("Total"), Cell::new(summary.total_count)]);
 
     println!("{}", table);
@@ -212,6 +216,7 @@ pub fn print_board_json(summary: &BoardSummary, issues: &[IssueInfo]) -> Result<
         open: usize,
         in_progress: usize,
         done: usize,
+        wontfix: usize,
         total: usize,
     }
 
@@ -231,6 +236,7 @@ pub fn print_board_json(summary: &BoardSummary, issues: &[IssueInfo]) -> Result<
             open: summary.open_count,
             in_progress: summary.in_progress_count,
             done: summary.done_count,
+            wontfix: summary.wontfix_count,
             total: summary.total_count,
         },
         issues: issues
