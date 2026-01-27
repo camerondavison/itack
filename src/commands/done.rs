@@ -1,7 +1,7 @@
 //! itack done command.
 
 use crate::core::{Project, Status};
-use crate::error::Result;
+use crate::error::{ItackError, Result};
 use crate::storage::db::load_issue;
 use crate::storage::write_issue;
 
@@ -14,6 +14,10 @@ pub struct DoneArgs {
 pub fn run(args: DoneArgs) -> Result<()> {
     let project = Project::discover()?;
     let mut issue_info = load_issue(&project.itack_dir, args.id)?;
+
+    if issue_info.issue.status == Status::Done {
+        return Err(ItackError::AlreadyDone(args.id));
+    }
 
     let old_status = issue_info.issue.status;
     issue_info.issue.status = Status::Done;

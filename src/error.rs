@@ -31,6 +31,9 @@ pub enum ItackError {
     #[error("Issue {0} is not claimed")]
     NotClaimed(u32),
 
+    #[error("Issue {0} is already done")]
+    AlreadyDone(u32),
+
     #[error("Database not found at {0}. Run 'itack init' to fix.")]
     DatabaseNotFound(std::path::PathBuf),
 
