@@ -6,8 +6,18 @@ use std::path::PathBuf;
 
 use crate::error::Result;
 
+/// Default value for data_branch config.
+fn default_data_branch() -> Option<String> {
+    Some("data/itack".to_string())
+}
+
+/// Default value for merge_branch config.
+fn default_merge_branch() -> Option<String> {
+    Some("main".to_string())
+}
+
 /// Global itack configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Default assignee name for claims.
     #[serde(default)]
@@ -16,6 +26,26 @@ pub struct Config {
     /// Default editor command.
     #[serde(default)]
     pub editor: Option<String>,
+
+    /// Branch where itack stores issue data (default: "data/itack").
+    #[serde(default = "default_data_branch")]
+    pub data_branch: Option<String>,
+
+    /// Branch to merge data into after commits (default: "main").
+    /// Set to empty string or null to disable merging (data-only mode).
+    #[serde(default = "default_merge_branch")]
+    pub merge_branch: Option<String>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            default_assignee: None,
+            editor: None,
+            data_branch: default_data_branch(),
+            merge_branch: default_merge_branch(),
+        }
+    }
 }
 
 impl Config {

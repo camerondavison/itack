@@ -108,3 +108,28 @@ itack doctor
 ## Important: One Issue at a Time
 
 Only claim and work on one issue at a time. If an issue is not claimed, assume someone else is working on it or will pick it up. Do not claim multiple issues simultaneously.
+
+## Configuration
+
+Global configuration is stored in `~/.itack/config.toml`:
+
+```toml
+# Default assignee name for claims
+default_assignee = "my-name"
+
+# Editor command (defaults to $EDITOR or vi)
+editor = "code --wait"
+
+# Branch where itack stores issue data (default: "data/itack")
+data_branch = "data/itack"
+
+# Branch to merge data into after commits (default: none)
+# Set to "main" to merge into main after each issue change
+merge_branch = "main"
+```
+
+### Data Branch Behavior
+
+- Issues are always committed to `data_branch` (default: `data/itack`)
+- If `merge_branch` is set (default: "main"), changes are merged into that branch after each commit, and files are written to the working directory
+- Set `merge_branch = ""` (empty string) for data-only mode, where files are only stored in the data branch, keeping the working directory clean

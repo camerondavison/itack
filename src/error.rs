@@ -61,6 +61,12 @@ pub enum ItackError {
     #[error("Editor failed: {0}")]
     EditorFailed(String),
 
+    #[error("Branch '{0}' does not exist")]
+    BranchNotFound(String),
+
+    #[error("Merge conflict between '{0}' and '{1}'. Resolve manually.")]
+    MergeConflict(String, String),
+
     #[error("Invalid markdown format: {0}")]
     InvalidMarkdown(String),
 
