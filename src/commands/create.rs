@@ -1,6 +1,6 @@
 //! itack create command.
 
-use crate::core::{Issue, Project, commit_file_to_head, commit_to_branch};
+use crate::core::{Issue, Project, commit_to_branch};
 use crate::error::Result;
 use crate::storage::write_issue;
 
@@ -47,7 +47,7 @@ pub fn run(args: CreateArgs) -> Result<()> {
     // Read back the content for data branch commit
     let content = std::fs::read(&path)?;
 
-    // Commit to data branch
+    // Commit to data branch only (feature branches get updated on 'done')
     commit_to_branch(
         &project.repo_root,
         data_branch,
@@ -55,9 +55,6 @@ pub fn run(args: CreateArgs) -> Result<()> {
         &content,
         &commit_message,
     )?;
-
-    // Commit to HEAD (stage and commit)
-    commit_file_to_head(&project.repo_root, &relative_path, &commit_message)?;
 
     println!("Created issue #{}: {}", id, args.title);
 

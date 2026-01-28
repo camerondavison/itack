@@ -1,8 +1,8 @@
 //! itack release command.
 
-use crate::core::{Project, commit_file_to_head, commit_to_branch};
+use crate::core::{Project, commit_to_branch};
 use crate::error::Result;
-use crate::storage::db::load_issue;
+use crate::storage::db::load_issue_from_data_branch;
 use crate::storage::write_issue;
 
 /// Arguments for the release command.
@@ -21,8 +21,9 @@ pub fn run(args: ReleaseArgs) -> Result<()> {
         .as_deref()
         .unwrap_or("data/itack");
 
-    // Load the issue from working directory
-    let mut issue_info = load_issue(&project.itack_dir, args.id)?;
+    // Load the issue from data branch (source of truth) and sync to working directory
+    let mut issue_info =
+        load_issue_from_data_branch(&project.repo_root, &project.itack_dir, data_branch, args.id)?;
 
     // Release in database
     db.release(args.id)?;
@@ -50,7 +51,7 @@ pub fn run(args: ReleaseArgs) -> Result<()> {
     // Read back the content for data branch commit
     let content = std::fs::read(&issue_info.path)?;
 
-    // Commit to data branch
+    // Commit to data branch only (feature branches get updated on 'done')
     let message = format!("Release issue #{}", args.id);
     commit_to_branch(
         &project.repo_root,
@@ -59,9 +60,6 @@ pub fn run(args: ReleaseArgs) -> Result<()> {
         &content,
         &message,
     )?;
-
-    // Commit to HEAD (stage and commit)
-    commit_file_to_head(&project.repo_root, &relative_path, &message)?;
 
     if let Some(assignee) = old_assignee {
         println!("Released issue #{} from {}", args.id, assignee);

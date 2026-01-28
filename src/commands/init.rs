@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use crate::core::{Config, Project};
+use crate::core::{Config, Project, commit_to_branch};
 use crate::error::Result;
 use crate::storage::{Database, Metadata, markdown};
 
@@ -50,6 +50,9 @@ fn repair_database() -> Result<()> {
 
     // Migrate issues to add title headings
     migrate_title_headings(&project)?;
+
+    // Migrate issues to data branch
+    migrate_to_data_branch(&project)?;
 
     // Use open_or_create to ensure directory and DB exist
     let mut db = Database::open_or_create(&project.db_path, &project.itack_dir)?;
@@ -137,6 +140,71 @@ fn migrate_title_headings(project: &Project) -> Result<()> {
                 }
             }
         }
+    }
+
+    Ok(())
+}
+
+/// Migrate issues from working directory to the data branch.
+fn migrate_to_data_branch(project: &Project) -> Result<()> {
+    use crate::core::find_issue_in_branch;
+
+    if !project.itack_dir.exists() {
+        return Ok(());
+    }
+
+    let data_branch = project
+        .config
+        .data_branch
+        .as_deref()
+        .unwrap_or("data/itack");
+
+    let mut migrated = 0;
+
+    for entry in fs::read_dir(&project.itack_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.extension().map(|e| e == "md").unwrap_or(false)
+            && let Ok((issue, _, _)) = markdown::read_issue(&path)
+        {
+            // Check if this issue already exists in the data branch
+            let exists_in_data_branch = matches!(
+                find_issue_in_branch(&project.repo_root, data_branch, issue.id),
+                Ok(Some(_))
+            );
+
+            if !exists_in_data_branch {
+                // Read the file content and commit to data branch
+                let content = fs::read(&path)?;
+                let relative_path = path
+                    .strip_prefix(&project.repo_root)
+                    .unwrap_or(&path)
+                    .to_path_buf();
+
+                let message = format!("Migrate issue #{} to data branch", issue.id);
+                commit_to_branch(
+                    &project.repo_root,
+                    data_branch,
+                    &relative_path,
+                    &content,
+                    &message,
+                )?;
+
+                println!(
+                    "Migrated issue #{} to data branch '{}'",
+                    issue.id, data_branch
+                );
+                migrated += 1;
+            }
+        }
+    }
+
+    if migrated > 0 {
+        println!(
+            "Migrated {} issues to data branch '{}'",
+            migrated, data_branch
+        );
     }
 
     Ok(())

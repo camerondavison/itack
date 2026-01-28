@@ -3,7 +3,7 @@
 use crate::core::Project;
 use crate::error::Result;
 use crate::output::{self, OutputFormat};
-use crate::storage::db::load_issue;
+use crate::storage::db::load_issue_from_data_branch;
 
 /// Arguments for the show command.
 pub struct ShowArgs {
@@ -14,7 +14,15 @@ pub struct ShowArgs {
 /// Show an issue.
 pub fn run(args: ShowArgs) -> Result<()> {
     let project = Project::discover()?;
-    let issue_info = load_issue(&project.itack_dir, args.id)?;
+    let data_branch = project
+        .config
+        .data_branch
+        .as_deref()
+        .unwrap_or("data/itack");
+
+    // Load issue from data branch (source of truth) - also syncs to working directory
+    let issue_info =
+        load_issue_from_data_branch(&project.repo_root, &project.itack_dir, data_branch, args.id)?;
 
     match args.format {
         OutputFormat::Table => {

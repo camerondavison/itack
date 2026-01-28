@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::fs;
 
-use crate::core::{Project, Status};
+use crate::core::{Project, Status, find_issue_in_branch};
 use crate::error::Result;
 use crate::storage::{Database, markdown};
 
@@ -90,6 +90,32 @@ pub fn run() -> Result<()> {
         }
     }
 
+    // Check 4: Issues missing from data branch
+    println!("\nChecking data branch synchronization...");
+    let data_branch = project
+        .config
+        .data_branch
+        .as_deref()
+        .unwrap_or("data/itack");
+    match check_data_branch_sync(&project, data_branch) {
+        Ok(missing) => {
+            if missing.is_empty() {
+                println!("  ✓ All issues synced to data branch '{}'", data_branch);
+            } else {
+                println!(
+                    "  ✗ Issues missing from data branch '{}': {:?}",
+                    data_branch, missing
+                );
+                println!("    Run 'itack init' to migrate issues to data branch.");
+                has_issues = true;
+            }
+        }
+        Err(e) => {
+            println!("  ✗ Could not check data branch: {}", e);
+            has_issues = true;
+        }
+    }
+
     // Summary
     println!();
     if has_issues {
@@ -148,6 +174,34 @@ impl SyncCheckResult {
             && self.orphan_claims.is_empty()
             && self.next_id_issue.is_none()
     }
+}
+
+/// Check for issues in working directory that are missing from the data branch.
+fn check_data_branch_sync(project: &Project, data_branch: &str) -> Result<Vec<u32>> {
+    let mut missing = Vec::new();
+
+    if !project.itack_dir.exists() {
+        return Ok(missing);
+    }
+
+    for entry in fs::read_dir(&project.itack_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.extension().map(|e| e == "md").unwrap_or(false)
+            && let Ok((issue, _, _)) = markdown::read_issue(&path)
+        {
+            // Check if this issue exists in the data branch
+            match find_issue_in_branch(&project.repo_root, data_branch, issue.id) {
+                Ok(Some(_)) => {} // Found in data branch
+                Ok(None) => missing.push(issue.id),
+                Err(_) => missing.push(issue.id), // Branch might not exist
+            }
+        }
+    }
+
+    missing.sort();
+    Ok(missing)
 }
 
 /// Check if issues in repo match what the database knows about.

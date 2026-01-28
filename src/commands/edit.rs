@@ -3,9 +3,8 @@
 use std::fs;
 use std::process::Command;
 
-use crate::core::{Project, commit_file_to_head, commit_to_branch};
+use crate::core::{Project, commit_to_branch, find_issue_in_branch, read_file_from_branch};
 use crate::error::{ItackError, Result};
-use crate::storage::db::load_issue;
 
 /// Arguments for the edit command.
 pub struct EditArgs {
@@ -28,9 +27,22 @@ pub fn run(args: EditArgs) -> Result<()> {
         .message
         .unwrap_or_else(|| format!("Edit issue #{}", args.id));
 
-    // Load issue to get its path
-    let issue_info = load_issue(&project.itack_dir, args.id)?;
-    let path = issue_info.path;
+    // Find the issue file in the data branch (source of truth)
+    let relative_path = find_issue_in_branch(&project.repo_root, data_branch, args.id)?
+        .ok_or(ItackError::IssueNotFound(args.id))?;
+
+    let path = project.repo_root.join(&relative_path);
+
+    // Read the latest content from the data branch and sync to working directory
+    if let Some(content) = read_file_from_branch(&project.repo_root, data_branch, &relative_path)? {
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, &content)?;
+    } else {
+        return Err(ItackError::IssueNotFound(args.id));
+    }
 
     // Open editor
     let status = Command::new(&editor)
@@ -54,7 +66,7 @@ pub fn run(args: EditArgs) -> Result<()> {
         .unwrap_or(&path)
         .to_path_buf();
 
-    // Commit to data branch
+    // Commit to data branch only (feature branches get updated on 'done')
     commit_to_branch(
         &project.repo_root,
         data_branch,
@@ -62,9 +74,6 @@ pub fn run(args: EditArgs) -> Result<()> {
         &content,
         &commit_message,
     )?;
-
-    // Commit to HEAD (stage and commit)
-    commit_file_to_head(&project.repo_root, &relative_path, &commit_message)?;
 
     Ok(())
 }

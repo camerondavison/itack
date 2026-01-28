@@ -395,8 +395,50 @@ pub fn load_all_issues(issues_dir: &Path) -> Result<Vec<IssueInfo>> {
     Ok(issues)
 }
 
-/// Load a single issue by ID.
+/// Load a single issue by ID from the data branch and sync to working directory.
+/// This is the preferred method for loading issues when you need the latest version.
+/// The data branch is the source of truth for issue content.
+pub fn load_issue_from_data_branch(
+    repo_root: &Path,
+    _issues_dir: &Path,
+    data_branch: &str,
+    id: u32,
+) -> Result<IssueInfo> {
+    use crate::core::{find_issue_in_branch, read_file_from_branch};
+
+    // Find the issue file in the data branch
+    let relative_path =
+        find_issue_in_branch(repo_root, data_branch, id)?.ok_or(ItackError::IssueNotFound(id))?;
+
+    // Read content from data branch
+    let content = read_file_from_branch(repo_root, data_branch, &relative_path)?
+        .ok_or(ItackError::IssueNotFound(id))?;
+
+    let path = repo_root.join(&relative_path);
+
+    // Ensure parent directory exists and write to working directory
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&path, &content)?;
+
+    // Parse the issue
+    let content_str = String::from_utf8(content)
+        .map_err(|e| ItackError::Other(format!("Invalid UTF-8: {}", e)))?;
+    let (issue, title, body) = markdown::parse_issue(&content_str)?;
+
+    Ok(IssueInfo {
+        issue,
+        title,
+        body,
+        path,
+    })
+}
+
+/// Load a single issue by ID from the working directory.
 /// Checks both new format (YYYY-MM-DD-issue-NNN.md) and old format (N.md).
+/// Note: Prefer `load_issue_from_data_branch` to get the latest version.
+#[allow(dead_code)]
 pub fn load_issue(issues_dir: &Path, id: u32) -> Result<IssueInfo> {
     // Check for new format files first (pattern: *-issue-{id:03}.md)
     let suffix = format!("-issue-{:03}.md", id);

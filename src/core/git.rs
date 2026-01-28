@@ -107,6 +107,87 @@ fn build_nested_tree(
     Ok(())
 }
 
+/// Read a file from a specific branch without checking it out.
+/// Returns None if the file doesn't exist in the branch.
+pub fn read_file_from_branch(
+    repo_path: &Path,
+    branch_name: &str,
+    file_path: &Path,
+) -> Result<Option<Vec<u8>>> {
+    let repo = Repository::discover(repo_path)?;
+
+    // Find the branch
+    let branch_ref = format!("refs/heads/{}", branch_name);
+    let reference = match repo.find_reference(&branch_ref) {
+        Ok(r) => r,
+        Err(e) if e.code() == git2::ErrorCode::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+
+    let commit = reference.peel_to_commit()?;
+    let tree = commit.tree()?;
+
+    // Convert path to string for tree lookup
+    let file_path_str = file_path.to_string_lossy();
+
+    // Navigate the tree to find the file
+    match tree.get_path(std::path::Path::new(file_path_str.as_ref())) {
+        Ok(entry) => {
+            let blob = repo.find_blob(entry.id())?;
+            Ok(Some(blob.content().to_vec()))
+        }
+        Err(e) if e.code() == git2::ErrorCode::NotFound => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Find an issue file in a branch by issue ID.
+/// Returns the relative path if found.
+pub fn find_issue_in_branch(
+    repo_path: &Path,
+    branch_name: &str,
+    issue_id: u32,
+) -> Result<Option<std::path::PathBuf>> {
+    let repo = Repository::discover(repo_path)?;
+
+    // Find the branch
+    let branch_ref = format!("refs/heads/{}", branch_name);
+    let reference = match repo.find_reference(&branch_ref) {
+        Ok(r) => r,
+        Err(e) if e.code() == git2::ErrorCode::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+
+    let commit = reference.peel_to_commit()?;
+    let tree = commit.tree()?;
+
+    // Look for .itack directory
+    let itack_entry = match tree.get_name(".itack") {
+        Some(entry) => entry,
+        None => return Ok(None),
+    };
+
+    let itack_tree = repo.find_tree(itack_entry.id())?;
+
+    // Look for file matching pattern *-issue-{id:03}.md
+    let suffix = format!("-issue-{:03}.md", issue_id);
+    for entry in itack_tree.iter() {
+        if let Some(name) = entry.name()
+            && name.ends_with(&suffix)
+        {
+            return Ok(Some(std::path::PathBuf::from(".itack").join(name)));
+        }
+    }
+
+    // Fall back to old format
+    let old_name = format!("{}.md", issue_id);
+    if itack_tree.get_name(&old_name).is_some() {
+        return Ok(Some(std::path::PathBuf::from(".itack").join(old_name)));
+    }
+
+    Ok(None)
+}
+
 /// Commit a file to HEAD by staging it and creating a commit.
 /// The file must already exist in the working directory with the desired content.
 /// Returns None if there are no changes to commit.

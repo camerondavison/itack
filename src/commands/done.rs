@@ -2,7 +2,7 @@
 
 use crate::core::{Project, Status, commit_file_to_head, commit_to_branch};
 use crate::error::{ItackError, Result};
-use crate::storage::db::load_issue;
+use crate::storage::db::load_issue_from_data_branch;
 use crate::storage::write_issue;
 
 /// Arguments for the done command.
@@ -19,8 +19,9 @@ pub fn run(args: DoneArgs) -> Result<()> {
         .as_deref()
         .unwrap_or("data/itack");
 
-    // Load issue from working directory
-    let mut issue_info = load_issue(&project.itack_dir, args.id)?;
+    // Load issue from data branch (source of truth) and sync to working directory
+    let mut issue_info =
+        load_issue_from_data_branch(&project.repo_root, &project.itack_dir, data_branch, args.id)?;
 
     if issue_info.issue.status == Status::Done {
         return Err(ItackError::AlreadyDone(args.id));

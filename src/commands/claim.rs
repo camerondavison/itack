@@ -1,8 +1,8 @@
 //! itack claim command.
 
-use crate::core::{Project, Status, commit_file_to_head, commit_to_branch};
+use crate::core::{Project, Status, commit_to_branch};
 use crate::error::Result;
-use crate::storage::db::load_issue;
+use crate::storage::db::load_issue_from_data_branch;
 use crate::storage::write_issue;
 
 /// Arguments for the claim command.
@@ -23,8 +23,9 @@ pub fn run(args: ClaimArgs) -> Result<()> {
         .as_deref()
         .unwrap_or("data/itack");
 
-    // Load the issue from working directory
-    let mut issue_info = load_issue(&project.itack_dir, args.id)?;
+    // Load the issue from data branch (source of truth) and sync to working directory
+    let mut issue_info =
+        load_issue_from_data_branch(&project.repo_root, &project.itack_dir, data_branch, args.id)?;
 
     // Try to claim in database (atomic operation)
     db.claim(args.id, &args.assignee)?;
@@ -55,7 +56,7 @@ pub fn run(args: ClaimArgs) -> Result<()> {
     // Read back the content for data branch commit
     let content = std::fs::read(&issue_info.path)?;
 
-    // Commit to data branch
+    // Commit to data branch only (feature branches get updated on 'done')
     let message = format!("Claim issue #{} for {}", args.id, args.assignee);
     commit_to_branch(
         &project.repo_root,
@@ -64,9 +65,6 @@ pub fn run(args: ClaimArgs) -> Result<()> {
         &content,
         &message,
     )?;
-
-    // Commit to HEAD (stage and commit)
-    commit_file_to_head(&project.repo_root, &relative_path, &message)?;
 
     println!("Claimed issue #{} for {}", args.id, args.assignee);
 

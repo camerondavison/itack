@@ -127,5 +127,6 @@ data_branch = "data/itack"
 ### Data Branch Behavior
 
 - Issue changes are committed to `data_branch` (default: `data/itack`)
-- Changes are then cherry-picked onto your current branch, updating the working directory, index, and HEAD
-- This keeps issue data synchronized across branches while maintaining a dedicated data branch for issue history
+- Only `itack done` commits to your current HEAD branch - other commands only commit to the data branch
+- When viewing/editing an issue, the latest version is always read from the `data/itack` branch, ensuring you see all edits regardless of which working branch you're on
+- This minimizes merge conflicts: feature branches only get issue commits when marking issues as "done", right before merging
