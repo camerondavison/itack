@@ -1,14 +1,13 @@
 //! Issue status enum with sort priority.
 
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::str::FromStr;
-
-use crate::error::{ItackError, Result};
 
 /// Issue status with defined sort priority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
+#[clap(rename_all = "kebab-case")]
 pub enum Status {
     #[default]
     Open,
@@ -36,21 +35,7 @@ impl fmt::Display for Status {
             Status::Open => write!(f, "open"),
             Status::InProgress => write!(f, "in-progress"),
             Status::Done => write!(f, "done"),
-            Status::WontFix => write!(f, "wontfix"),
-        }
-    }
-}
-
-impl FromStr for Status {
-    type Err = ItackError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "open" => Ok(Status::Open),
-            "in-progress" | "inprogress" | "in_progress" => Ok(Status::InProgress),
-            "done" => Ok(Status::Done),
-            "wontfix" | "wont-fix" | "wont_fix" => Ok(Status::WontFix),
-            _ => Err(ItackError::InvalidStatus(s.to_string())),
+            Status::WontFix => write!(f, "wont-fix"),
         }
     }
 }
@@ -68,21 +53,10 @@ mod tests {
     }
 
     #[test]
-    fn test_status_from_str() {
-        assert_eq!(Status::from_str("open").unwrap(), Status::Open);
-        assert_eq!(Status::from_str("in-progress").unwrap(), Status::InProgress);
-        assert_eq!(Status::from_str("done").unwrap(), Status::Done);
-        assert_eq!(Status::from_str("wontfix").unwrap(), Status::WontFix);
-        assert_eq!(Status::from_str("wont-fix").unwrap(), Status::WontFix);
-        assert_eq!(Status::from_str("wont_fix").unwrap(), Status::WontFix);
-        assert!(Status::from_str("invalid").is_err());
-    }
-
-    #[test]
     fn test_status_display() {
         assert_eq!(Status::Open.to_string(), "open");
         assert_eq!(Status::InProgress.to_string(), "in-progress");
         assert_eq!(Status::Done.to_string(), "done");
-        assert_eq!(Status::WontFix.to_string(), "wontfix");
+        assert_eq!(Status::WontFix.to_string(), "wont-fix");
     }
 }

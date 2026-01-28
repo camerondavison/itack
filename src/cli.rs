@@ -85,7 +85,7 @@ pub enum Commands {
     /// List issues
     List {
         /// Filter by status
-        #[arg(short, long, value_parser = parse_status)]
+        #[arg(short, long)]
         status: Option<Status>,
 
         /// Filter by epic
@@ -130,8 +130,4 @@ pub enum Commands {
         /// Shell to generate completions for
         shell: Shell,
     },
-}
-
-fn parse_status(s: &str) -> Result<Status, String> {
-    s.parse::<Status>().map_err(|e| e.to_string())
 }
