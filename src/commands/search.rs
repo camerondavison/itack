@@ -5,7 +5,7 @@ use std::process::Command;
 use crate::core::Project;
 use crate::error::Result;
 use crate::output::{self, OutputFormat};
-use crate::storage::db::load_all_issues;
+use crate::storage::db::load_all_issues_from_data_branch;
 
 /// Arguments for the search command.
 pub struct SearchArgs {
@@ -23,7 +23,12 @@ pub fn run(args: SearchArgs) -> Result<()> {
         search_all_branches(&args.query)?;
     } else {
         // Search current issues by title and body
-        let issues = load_all_issues(&project.itack_dir)?;
+        let data_branch = project
+            .config
+            .data_branch
+            .as_deref()
+            .unwrap_or("data/itack");
+        let issues = load_all_issues_from_data_branch(&project.repo_root, data_branch)?;
         let query_lower = args.query.to_lowercase();
 
         let matching: Vec<_> = issues

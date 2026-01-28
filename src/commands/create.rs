@@ -56,6 +56,9 @@ pub fn run(args: CreateArgs) -> Result<()> {
         &commit_message,
     )?;
 
+    // Delete from working directory (only exists in data branch until 'done')
+    std::fs::remove_file(&path)?;
+
     println!("Created issue #{}: {}", id, args.title);
 
     Ok(())

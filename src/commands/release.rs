@@ -61,6 +61,9 @@ pub fn run(args: ReleaseArgs) -> Result<()> {
         &message,
     )?;
 
+    // Delete from working directory (only exists in data branch until 'done')
+    std::fs::remove_file(&issue_info.path)?;
+
     if let Some(assignee) = old_assignee {
         println!("Released issue #{} from {}", args.id, assignee);
     } else {

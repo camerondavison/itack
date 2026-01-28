@@ -66,6 +66,9 @@ pub fn run(args: ClaimArgs) -> Result<()> {
         &message,
     )?;
 
+    // Delete from working directory (only exists in data branch until 'done')
+    std::fs::remove_file(&issue_info.path)?;
+
     println!("Claimed issue #{} for {}", args.id, args.assignee);
 
     Ok(())

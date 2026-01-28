@@ -3,7 +3,7 @@
 use crate::core::{Project, Status};
 use crate::error::Result;
 use crate::output::{self, OutputFormat};
-use crate::storage::db::load_all_issues;
+use crate::storage::db::load_all_issues_from_data_branch;
 
 /// Arguments for the board command.
 pub struct BoardArgs {
@@ -27,7 +27,12 @@ pub fn run(args: BoardArgs) -> Result<()> {
     // Verify database exists (will error with helpful message if not)
     let _db = project.open_db()?;
 
-    let issues = load_all_issues(&project.itack_dir)?;
+    let data_branch = project
+        .config
+        .data_branch
+        .as_deref()
+        .unwrap_or("data/itack");
+    let issues = load_all_issues_from_data_branch(&project.repo_root, data_branch)?;
 
     let summary = BoardSummary {
         project_id: project.metadata.project_id.clone(),

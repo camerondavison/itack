@@ -3,7 +3,7 @@
 use crate::core::{Project, Status};
 use crate::error::Result;
 use crate::output::{self, OutputFormat};
-use crate::storage::db::load_all_issues;
+use crate::storage::db::load_all_issues_from_data_branch;
 
 /// Arguments for the list command.
 pub struct ListArgs {
@@ -16,7 +16,12 @@ pub struct ListArgs {
 /// List issues with optional filters.
 pub fn run(args: ListArgs) -> Result<()> {
     let project = Project::discover()?;
-    let mut issues = load_all_issues(&project.itack_dir)?;
+    let data_branch = project
+        .config
+        .data_branch
+        .as_deref()
+        .unwrap_or("data/itack");
+    let mut issues = load_all_issues_from_data_branch(&project.repo_root, data_branch)?;
 
     // Apply filters
     if let Some(status) = args.status {

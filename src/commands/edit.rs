@@ -75,5 +75,8 @@ pub fn run(args: EditArgs) -> Result<()> {
         &commit_message,
     )?;
 
+    // Delete from working directory (only exists in data branch until 'done')
+    fs::remove_file(&path)?;
+
     Ok(())
 }

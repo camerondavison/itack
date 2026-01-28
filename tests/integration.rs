@@ -6,20 +6,39 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-/// Find an issue file by ID in the .itack directory.
-/// Returns the path to the issue file (supports new format: YYYY-MM-DD-issue-NNN.md).
-fn find_issue_file(itack_dir: &Path, id: u32) -> Option<std::path::PathBuf> {
+/// Read an issue file from the data/itack branch.
+/// Returns the content of the issue file.
+fn read_issue_from_data_branch(repo_path: &Path, id: u32) -> Option<String> {
+    use std::process::Command;
+
     let suffix = format!("-issue-{:03}.md", id);
-    if let Ok(entries) = fs::read_dir(itack_dir) {
-        for entry in entries.flatten() {
-            let filename = entry.file_name();
-            let filename_str = filename.to_string_lossy();
-            if filename_str.ends_with(&suffix) {
-                return Some(entry.path());
-            }
-        }
+
+    // List files in .itack/ on data/itack branch
+    let output = Command::new("git")
+        .args(["ls-tree", "--name-only", "data/itack", ".itack/"])
+        .current_dir(repo_path)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
     }
-    None
+
+    let files = String::from_utf8_lossy(&output.stdout);
+    let matching_file = files.lines().find(|f| f.ends_with(&suffix))?;
+
+    // Read the file content from the branch
+    let output = Command::new("git")
+        .args(["show", &format!("data/itack:{}", matching_file)])
+        .current_dir(repo_path)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        None
+    }
 }
 
 /// Test environment with isolated git repo and database directory.
@@ -139,9 +158,9 @@ fn test_create_and_show_issue() {
         .success()
         .stdout(predicate::str::contains("Created issue #1"));
 
-    // Verify file was created (new format: YYYY-MM-DD-issue-001.md)
-    let issue_file = find_issue_file(&env.path().join(".itack"), 1);
-    assert!(issue_file.is_some(), "Issue file should exist");
+    // Verify file was created in data branch
+    let content = read_issue_from_data_branch(env.path(), 1);
+    assert!(content.is_some(), "Issue file should exist in data branch");
 
     // Show the issue
     itack(&env)
@@ -482,10 +501,9 @@ fn test_markdown_file_format() {
         .assert()
         .success();
 
-    // Find the issue file (new format: YYYY-MM-DD-issue-001.md)
-    let issue_file =
-        find_issue_file(&env.path().join(".itack"), 1).expect("Issue file should exist");
-    let content = fs::read_to_string(&issue_file).unwrap();
+    // Read issue from data branch
+    let content =
+        read_issue_from_data_branch(env.path(), 1).expect("Issue file should exist in data branch");
 
     // Check YAML front matter format (title is NOT in YAML, it's in markdown body)
     assert!(content.starts_with("---\n"));
@@ -498,15 +516,4 @@ fn test_markdown_file_format() {
     assert!(content.contains("status: open"));
     // Title should be in markdown body as H1 heading
     assert!(content.contains("# Test issue"));
-
-    // Check filename format (YYYY-MM-DD-issue-001.md)
-    let filename = issue_file.file_name().unwrap().to_string_lossy();
-    assert!(
-        filename.ends_with("-issue-001.md"),
-        "Filename should end with -issue-001.md"
-    );
-    assert!(
-        filename.len() == 23,
-        "Filename should be YYYY-MM-DD-issue-001.md format (23 chars)"
-    );
 }

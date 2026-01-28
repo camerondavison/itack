@@ -1,11 +1,11 @@
 //! itack doctor command - diagnose database and issue sync issues.
 
 use std::collections::HashSet;
-use std::fs;
 
-use crate::core::{Project, Status, find_issue_in_branch};
+use crate::core::{Project, Status};
 use crate::error::Result;
-use crate::storage::{Database, markdown};
+use crate::storage::Database;
+use crate::storage::db::load_all_issues_from_data_branch;
 
 /// Expected schema version (must match SCHEMA_VERSION in db.rs).
 const EXPECTED_SCHEMA_VERSION: i32 = 1;
@@ -14,6 +14,12 @@ const EXPECTED_SCHEMA_VERSION: i32 = 1;
 pub fn run() -> Result<()> {
     let project = Project::discover()?;
     let mut has_issues = false;
+
+    let data_branch = project
+        .config
+        .data_branch
+        .as_deref()
+        .unwrap_or("data/itack");
 
     // Check 1: Database schema version
     println!("Checking database schema version...");
@@ -37,14 +43,14 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Check 2: Compare issues in repo vs database knowledge
+    // Check 2: Compare issues in data branch vs database knowledge
     println!("\nChecking issue synchronization...");
-    match check_issue_sync(&project) {
+    match check_issue_sync(&project, data_branch) {
         Ok(sync_result) => {
             if sync_result.is_ok() {
                 println!(
-                    "  ✓ Issues in sync: {} issues found",
-                    sync_result.repo_issues.len()
+                    "  ✓ Issues in sync: {} issues found in '{}'",
+                    sync_result.issue_count, data_branch
                 );
             } else {
                 has_issues = true;
@@ -60,7 +66,7 @@ pub fn run() -> Result<()> {
                         sync_result.orphan_claims
                     );
                 }
-                if let Some(msg) = sync_result.next_id_issue {
+                if let Some(msg) = &sync_result.next_id_issue {
                     println!("  ✗ {}", msg);
                 }
                 println!("    Run 'itack init' to repair the database.");
@@ -68,50 +74,6 @@ pub fn run() -> Result<()> {
         }
         Err(e) => {
             println!("  ✗ Could not check issue synchronization: {}", e);
-            has_issues = true;
-        }
-    }
-
-    // Check 3: Issues missing title heading
-    println!("\nChecking issue markdown format...");
-    match check_title_headings(&project) {
-        Ok(missing) => {
-            if missing.is_empty() {
-                println!("  ✓ All issues have title headings");
-            } else {
-                println!("  ✗ Issues missing title heading: {:?}", missing);
-                println!("    Run 'itack init' to repair.");
-                has_issues = true;
-            }
-        }
-        Err(e) => {
-            println!("  ✗ Could not check issue format: {}", e);
-            has_issues = true;
-        }
-    }
-
-    // Check 4: Issues missing from data branch
-    println!("\nChecking data branch synchronization...");
-    let data_branch = project
-        .config
-        .data_branch
-        .as_deref()
-        .unwrap_or("data/itack");
-    match check_data_branch_sync(&project, data_branch) {
-        Ok(missing) => {
-            if missing.is_empty() {
-                println!("  ✓ All issues synced to data branch '{}'", data_branch);
-            } else {
-                println!(
-                    "  ✗ Issues missing from data branch '{}': {:?}",
-                    data_branch, missing
-                );
-                println!("    Run 'itack init' to migrate issues to data branch.");
-                has_issues = true;
-            }
-        }
-        Err(e) => {
-            println!("  ✗ Could not check data branch: {}", e);
             has_issues = true;
         }
     }
@@ -128,32 +90,6 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-/// Check for issues missing the title heading in markdown.
-fn check_title_headings(project: &Project) -> Result<Vec<u32>> {
-    let mut missing = Vec::new();
-
-    if !project.itack_dir.exists() {
-        return Ok(missing);
-    }
-
-    for entry in fs::read_dir(&project.itack_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.extension().map(|e| e == "md").unwrap_or(false) {
-            let content = fs::read_to_string(&path)?;
-            if !markdown::has_title_heading(&content)
-                && let Ok((issue, _, _)) = markdown::parse_issue(&content)
-            {
-                missing.push(issue.id);
-            }
-        }
-    }
-
-    missing.sort();
-    Ok(missing)
-}
-
 /// Check the database schema version.
 fn check_schema_version(project: &Project) -> Result<i32> {
     let db = Database::open(&project.db_path, &project.itack_dir)?;
@@ -162,7 +98,7 @@ fn check_schema_version(project: &Project) -> Result<i32> {
 
 /// Result of checking issue synchronization.
 struct SyncCheckResult {
-    repo_issues: HashSet<u32>,
+    issue_count: usize,
     missing_claims: Vec<u32>,
     orphan_claims: Vec<u32>,
     next_id_issue: Option<String>,
@@ -176,96 +112,45 @@ impl SyncCheckResult {
     }
 }
 
-/// Check for issues in working directory that are missing from the data branch.
-fn check_data_branch_sync(project: &Project, data_branch: &str) -> Result<Vec<u32>> {
-    let mut missing = Vec::new();
-
-    if !project.itack_dir.exists() {
-        return Ok(missing);
-    }
-
-    for entry in fs::read_dir(&project.itack_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.extension().map(|e| e == "md").unwrap_or(false)
-            && let Ok((issue, _, _)) = markdown::read_issue(&path)
-        {
-            // Check if this issue exists in the data branch
-            match find_issue_in_branch(&project.repo_root, data_branch, issue.id) {
-                Ok(Some(_)) => {} // Found in data branch
-                Ok(None) => missing.push(issue.id),
-                Err(_) => missing.push(issue.id), // Branch might not exist
-            }
-        }
-    }
-
-    missing.sort();
-    Ok(missing)
-}
-
-/// Check if issues in repo match what the database knows about.
-fn check_issue_sync(project: &Project) -> Result<SyncCheckResult> {
+/// Check if issues in data branch match what the database knows about.
+fn check_issue_sync(project: &Project, data_branch: &str) -> Result<SyncCheckResult> {
     let db = Database::open(&project.db_path, &project.itack_dir)?;
 
-    // Get all issue IDs from the repo
-    let mut repo_issues: HashSet<u32> = HashSet::new();
-    let mut max_repo_id: u32 = 0;
+    // Get all issues from data branch
+    let issues = load_all_issues_from_data_branch(&project.repo_root, data_branch)?;
 
-    if project.itack_dir.exists() {
-        for entry in fs::read_dir(&project.itack_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.extension().map(|e| e == "md").unwrap_or(false)
-                && let Ok((issue, _, _)) = markdown::read_issue(&path)
-            {
-                repo_issues.insert(issue.id);
-                max_repo_id = max_repo_id.max(issue.id);
-            }
-        }
-    }
+    let issue_ids: HashSet<u32> = issues.iter().map(|i| i.issue.id).collect();
+    let max_issue_id = issues.iter().map(|i| i.issue.id).max().unwrap_or(0);
 
     // Get claims from database
     let claims = db.list_claims()?;
     let claimed_ids: HashSet<u32> = claims.iter().map(|(id, _, _)| *id).collect();
 
     // Find in-progress issues that don't have claims in the database
-    // (only check in-progress since done issues may have stale assignees)
-    let mut missing_claims = Vec::new();
-    for entry in fs::read_dir(&project.itack_dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-    {
-        let path = entry.path();
-        if path.extension().map(|e| e == "md").unwrap_or(false)
-            && let Ok((issue, _, _)) = markdown::read_issue(&path)
-            && issue.status == Status::InProgress
-            && !claimed_ids.contains(&issue.id)
-        {
-            missing_claims.push(issue.id);
-        }
-    }
+    let mut missing_claims: Vec<u32> = issues
+        .iter()
+        .filter(|i| i.issue.status == Status::InProgress && !claimed_ids.contains(&i.issue.id))
+        .map(|i| i.issue.id)
+        .collect();
     missing_claims.sort();
 
-    // Find claims for issues that don't exist in repo
-    let mut orphan_claims: Vec<u32> = claimed_ids.difference(&repo_issues).copied().collect();
+    // Find claims for issues that don't exist
+    let mut orphan_claims: Vec<u32> = claimed_ids.difference(&issue_ids).copied().collect();
     orphan_claims.sort();
 
     // Check next_issue_id
     let next_id = db.peek_next_issue_id()?;
-    let next_id_issue = if !repo_issues.is_empty() && next_id <= max_repo_id {
+    let next_id_issue = if !issues.is_empty() && next_id <= max_issue_id {
         Some(format!(
-            "next_issue_id ({}) is not greater than max issue ID in repo ({})",
-            next_id, max_repo_id
+            "next_issue_id ({}) is not greater than max issue ID ({})",
+            next_id, max_issue_id
         ))
     } else {
         None
     };
 
     Ok(SyncCheckResult {
-        repo_issues,
+        issue_count: issues.len(),
         missing_claims,
         orphan_claims,
         next_id_issue,

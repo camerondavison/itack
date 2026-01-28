@@ -348,7 +348,78 @@ pub struct IssueInfo {
     pub path: std::path::PathBuf,
 }
 
-/// Load all issues from the issues directory.
+/// Load all issues from the data branch.
+pub fn load_all_issues_from_data_branch(
+    repo_root: &Path,
+    data_branch: &str,
+) -> Result<Vec<IssueInfo>> {
+    use crate::core::read_file_from_branch;
+    use git2::Repository;
+
+    let mut issues = Vec::new();
+
+    let repo = match Repository::discover(repo_root) {
+        Ok(r) => r,
+        Err(_) => return Ok(issues),
+    };
+
+    // Find the branch
+    let branch_ref = format!("refs/heads/{}", data_branch);
+    let reference = match repo.find_reference(&branch_ref) {
+        Ok(r) => r,
+        Err(_) => return Ok(issues), // Branch doesn't exist yet
+    };
+
+    let commit = reference.peel_to_commit()?;
+    let tree = commit.tree()?;
+
+    // Look for .itack directory
+    let itack_entry = match tree.get_name(".itack") {
+        Some(entry) => entry,
+        None => return Ok(issues),
+    };
+
+    let itack_tree = repo.find_tree(itack_entry.id())?;
+
+    // Iterate over all .md files in .itack/
+    for entry in itack_tree.iter() {
+        if let Some(name) = entry.name()
+            && name.ends_with(".md") && !name.starts_with('.') {
+                let relative_path = std::path::PathBuf::from(".itack").join(name);
+                if let Some(content) =
+                    read_file_from_branch(repo_root, data_branch, &relative_path)?
+                    && let Ok(content_str) = String::from_utf8(content)
+                        && let Ok((issue, title, body)) = markdown::parse_issue(&content_str) {
+                            issues.push(IssueInfo {
+                                issue,
+                                title,
+                                body,
+                                path: repo_root.join(&relative_path),
+                            });
+                        }
+            }
+    }
+
+    // Sort by status priority, then by ID
+    issues.sort_by(|a, b| {
+        let status_cmp = a
+            .issue
+            .status
+            .sort_priority()
+            .cmp(&b.issue.status.sort_priority());
+        if status_cmp == std::cmp::Ordering::Equal {
+            a.issue.id.cmp(&b.issue.id)
+        } else {
+            status_cmp
+        }
+    });
+
+    Ok(issues)
+}
+
+/// Load all issues from the issues directory (working directory).
+/// Note: Prefer `load_all_issues_from_data_branch` to get the latest version.
+#[allow(dead_code)]
 pub fn load_all_issues(issues_dir: &Path) -> Result<Vec<IssueInfo>> {
     let mut issues = Vec::new();
 

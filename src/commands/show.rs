@@ -33,5 +33,8 @@ pub fn run(args: ShowArgs) -> Result<()> {
         }
     }
 
+    // Delete from working directory (only exists in data branch until 'done')
+    let _ = std::fs::remove_file(&issue_info.path);
+
     Ok(())
 }
