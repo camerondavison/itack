@@ -107,156 +107,84 @@ fn build_nested_tree(
     Ok(())
 }
 
-/// Merge source branch into target branch without checkout.
-/// Returns the merge commit OID if successful.
-/// Returns error if merge has conflicts.
-/// If target branch doesn't exist, creates it pointing at source.
-pub fn merge_branches(repo_path: &Path, source_branch: &str, target_branch: &str) -> Result<Oid> {
+/// Cherry-pick a commit onto the current HEAD branch.
+/// Updates working directory, index, and creates a new commit on HEAD.
+/// If HEAD is unborn (no commits yet), creates the first commit.
+pub fn cherry_pick_to_head(repo_path: &Path, commit_oid: Oid, message: &str) -> Result<Oid> {
     let repo = Repository::discover(repo_path)?;
     let signature = repo
         .signature()
         .or_else(|_| Signature::now("itack", "itack@localhost"))?;
 
-    // Find both branch commits
-    let source_ref = format!("refs/heads/{}", source_branch);
-    let target_ref = format!("refs/heads/{}", target_branch);
+    let commit = repo.find_commit(commit_oid)?;
 
-    let source_commit = repo
-        .find_reference(&source_ref)
-        .map_err(|_| ItackError::BranchNotFound(source_branch.to_string()))?
-        .peel_to_commit()?;
-
-    // Try to find target branch - if it doesn't exist, create it pointing at source
-    let target_commit = match repo.find_reference(&target_ref) {
-        Ok(reference) => reference.peel_to_commit()?,
-        Err(e) if e.code() == git2::ErrorCode::NotFound => {
-            // Target branch doesn't exist - create it pointing at source
-            repo.reference(
-                &target_ref,
-                source_commit.id(),
-                false,
-                &format!("Create {} from {}", target_branch, source_branch),
-            )?;
-            return Ok(source_commit.id());
-        }
+    // Check if HEAD exists (repo might have no commits yet)
+    let head_commit = match repo.head() {
+        Ok(head) => Some(head.peel_to_commit()?),
+        Err(e) if e.code() == git2::ErrorCode::UnbornBranch => None,
         Err(e) => return Err(e.into()),
     };
 
-    // Check if source is already merged (target contains source)
-    if repo.graph_descendant_of(target_commit.id(), source_commit.id())? {
-        // Already merged
-        return Ok(target_commit.id());
-    }
+    if head_commit.is_none() {
+        // No commits yet - just checkout the commit's tree and create first commit on HEAD
+        let tree = commit.tree()?;
 
-    // Check if fast-forward is possible (source contains target)
-    if repo.graph_descendant_of(source_commit.id(), target_commit.id())? {
-        // Fast-forward: just update the target ref
-        repo.reference(
-            &target_ref,
-            source_commit.id(),
-            true,
-            &format!(
-                "Fast-forward merge {} into {}",
-                source_branch, target_branch
-            ),
+        // Update index to match the tree
+        let mut index = repo.index()?;
+        index.read_tree(&tree)?;
+        index.write()?;
+
+        // Checkout the tree to working directory
+        repo.checkout_tree(
+            tree.as_object(),
+            Some(git2::build::CheckoutBuilder::new().force()),
         )?;
-        return Ok(source_commit.id());
+
+        // Create the first commit on HEAD
+        let new_oid = repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            message,
+            &tree,
+            &[], // No parents for first commit
+        )?;
+
+        return Ok(new_oid);
     }
 
-    // Need a real merge - find merge base
-    let merge_base = repo.merge_base(source_commit.id(), target_commit.id())?;
-    let base_commit = repo.find_commit(merge_base)?;
-    let base_tree = base_commit.tree()?;
+    let head = head_commit.unwrap();
 
-    let source_tree = source_commit.tree()?;
-    let target_tree = target_commit.tree()?;
+    // Cherry-pick: apply the commit's changes
+    repo.cherrypick(&commit, None)?;
 
-    // Perform three-way merge
-    let mut index = repo.merge_trees(&base_tree, &target_tree, &source_tree, None)?;
-
+    // Check for conflicts
+    let index = repo.index()?;
     if index.has_conflicts() {
+        repo.cleanup_state()?;
         return Err(ItackError::MergeConflict(
-            source_branch.to_string(),
-            target_branch.to_string(),
+            "cherry-pick".to_string(),
+            "HEAD".to_string(),
         ));
     }
 
-    // Write the merged tree
-    let tree_oid = index.write_tree_to(&repo)?;
-    let merged_tree = repo.find_tree(tree_oid)?;
+    // Write the tree from the index
+    let mut index = repo.index()?;
+    let tree_oid = index.write_tree()?;
+    let tree = repo.find_tree(tree_oid)?;
 
-    // Create merge commit
-    let message = format!("Merge {} into {}", source_branch, target_branch);
-    let merge_oid = repo.commit(
-        Some(&target_ref),
+    // Create the commit
+    let new_oid = repo.commit(
+        Some("HEAD"),
         &signature,
         &signature,
-        &message,
-        &merged_tree,
-        &[&target_commit, &source_commit],
+        message,
+        &tree,
+        &[&head],
     )?;
 
-    Ok(merge_oid)
-}
+    // Clean up cherry-pick state
+    repo.cleanup_state()?;
 
-/// Read a file from a specific branch without checkout.
-pub fn read_file_from_branch(
-    repo_path: &Path,
-    branch_name: &str,
-    file_path: &Path,
-) -> Result<Vec<u8>> {
-    let repo = Repository::discover(repo_path)?;
-
-    let branch_ref = format!("refs/heads/{}", branch_name);
-    let commit = repo
-        .find_reference(&branch_ref)
-        .map_err(|_| ItackError::BranchNotFound(branch_name.to_string()))?
-        .peel_to_commit()?;
-
-    let tree = commit.tree()?;
-    let file_path_str = file_path.to_string_lossy();
-
-    let entry = tree
-        .get_path(Path::new(&*file_path_str))
-        .map_err(|_| ItackError::Other(format!("File not found in branch: {}", file_path_str)))?;
-
-    let blob = repo.find_blob(entry.id())?;
-    Ok(blob.content().to_vec())
-}
-
-/// Find an issue file in a branch by ID suffix (e.g., "-issue-001.md").
-/// Returns the relative path to the file.
-pub fn find_issue_file_in_branch(
-    repo_path: &Path,
-    branch_name: &str,
-    issue_id: u32,
-) -> Result<std::path::PathBuf> {
-    let repo = Repository::discover(repo_path)?;
-
-    let branch_ref = format!("refs/heads/{}", branch_name);
-    let commit = repo
-        .find_reference(&branch_ref)
-        .map_err(|_| ItackError::BranchNotFound(branch_name.to_string()))?
-        .peel_to_commit()?;
-
-    let tree = commit.tree()?;
-    let suffix = format!("-issue-{:03}.md", issue_id);
-
-    // Walk the tree looking for the issue file
-    let mut found_path = None;
-    tree.walk(git2::TreeWalkMode::PreOrder, |root, entry| {
-        let name = entry.name().unwrap_or("");
-        if name.ends_with(&suffix) {
-            let full_path = if root.is_empty() {
-                name.to_string()
-            } else {
-                format!("{}{}", root, name)
-            };
-            found_path = Some(std::path::PathBuf::from(full_path));
-            return git2::TreeWalkResult::Abort;
-        }
-        git2::TreeWalkResult::Ok
-    })?;
-
-    found_path.ok_or_else(|| ItackError::IssueNotFound(issue_id))
+    Ok(new_oid)
 }

@@ -122,14 +122,10 @@ editor = "code --wait"
 
 # Branch where itack stores issue data (default: "data/itack")
 data_branch = "data/itack"
-
-# Branch to merge data into after commits (default: none)
-# Set to "main" to merge into main after each issue change
-merge_branch = "main"
 ```
 
 ### Data Branch Behavior
 
-- Issues are always committed to `data_branch` (default: `data/itack`)
-- If `merge_branch` is set (default: "main"), changes are merged into that branch after each commit, and files are written to the working directory
-- Set `merge_branch = ""` (empty string) for data-only mode, where files are only stored in the data branch, keeping the working directory clean
+- Issue changes are committed to `data_branch` (default: `data/itack`)
+- Changes are then cherry-picked onto your current branch, updating the working directory, index, and HEAD
+- This keeps issue data synchronized across branches while maintaining a dedicated data branch for issue history

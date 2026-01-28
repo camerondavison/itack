@@ -1,8 +1,8 @@
 //! itack create command.
 
-use crate::core::{Issue, Project, commit_to_branch, merge_branches};
+use crate::core::{Issue, Project, cherry_pick_to_head, commit_to_branch};
 use crate::error::Result;
-use crate::storage::{format_issue, write_issue};
+use crate::storage::format_issue;
 
 /// Arguments for the create command.
 pub struct CreateArgs {
@@ -34,12 +34,6 @@ pub fn run(args: CreateArgs) -> Result<()> {
     let body = args.body.as_deref().unwrap_or("");
     let content = format_issue(&issue, &args.title, body)?;
 
-    // Write to working directory if merge_branch is set
-    if project.config.merge_branch.is_some() {
-        write_issue(&path, &issue, &args.title, body)?;
-    }
-
-    // Auto-commit to data branch
     let commit_message = args
         .message
         .unwrap_or_else(|| format!("Create issue #{}: {}", id, args.title));
@@ -50,7 +44,8 @@ pub fn run(args: CreateArgs) -> Result<()> {
         .as_deref()
         .unwrap_or("data/itack");
 
-    commit_to_branch(
+    // Commit to data branch
+    let commit_oid = commit_to_branch(
         &project.repo_root,
         data_branch,
         &relative_path,
@@ -58,11 +53,9 @@ pub fn run(args: CreateArgs) -> Result<()> {
         &commit_message,
     )?;
 
-    // Merge into main if configured
-    if let Some(ref merge_branch) = project.config.merge_branch
-        && !merge_branch.is_empty()
-    {
-        merge_branches(&project.repo_root, data_branch, merge_branch)?;
+    // Cherry-pick onto current branch (updates working dir, index, and HEAD)
+    if let Some(oid) = commit_oid {
+        cherry_pick_to_head(&project.repo_root, oid, &commit_message)?;
     }
 
     println!("Created issue #{}: {}", id, args.title);
