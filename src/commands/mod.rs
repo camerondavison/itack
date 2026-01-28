@@ -43,7 +43,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             },
         }),
 
-        Commands::Edit { id, message } => edit::run(edit::EditArgs { id, message }),
+        Commands::Edit { id, body, message } => edit::run(edit::EditArgs { id, body, message }),
 
         Commands::Done { id } => done::run(done::DoneArgs { id }),
 

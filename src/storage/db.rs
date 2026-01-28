@@ -384,20 +384,22 @@ pub fn load_all_issues_from_data_branch(
     // Iterate over all .md files in .itack/
     for entry in itack_tree.iter() {
         if let Some(name) = entry.name()
-            && name.ends_with(".md") && !name.starts_with('.') {
-                let relative_path = std::path::PathBuf::from(".itack").join(name);
-                if let Some(content) =
-                    read_file_from_branch(repo_root, data_branch, &relative_path)?
-                    && let Ok(content_str) = String::from_utf8(content)
-                        && let Ok((issue, title, body)) = markdown::parse_issue(&content_str) {
-                            issues.push(IssueInfo {
-                                issue,
-                                title,
-                                body,
-                                path: repo_root.join(&relative_path),
-                            });
-                        }
+            && name.ends_with(".md")
+            && !name.starts_with('.')
+        {
+            let relative_path = std::path::PathBuf::from(".itack").join(name);
+            if let Some(content) = read_file_from_branch(repo_root, data_branch, &relative_path)?
+                && let Ok(content_str) = String::from_utf8(content)
+                && let Ok((issue, title, body)) = markdown::parse_issue(&content_str)
+            {
+                issues.push(IssueInfo {
+                    issue,
+                    title,
+                    body,
+                    path: repo_root.join(&relative_path),
+                });
             }
+        }
     }
 
     // Sort by status priority, then by ID

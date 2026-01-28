@@ -52,6 +52,10 @@ pub enum Commands {
         /// Issue ID
         id: u32,
 
+        /// Set the issue body directly (skips editor)
+        #[arg(short, long)]
+        body: Option<String>,
+
         /// Custom git commit message (defaults to "Edit issue #N")
         #[arg(short, long)]
         message: Option<String>,

@@ -86,6 +86,9 @@ Issues are automatically committed to git after editing.
 # Open issue in editor
 itack edit <id>
 
+# Set the issue body directly (skips editor)
+itack edit <id> --body "New description"
+
 # Edit with a custom commit message
 itack edit <id> --message "Custom commit message"
 ```
