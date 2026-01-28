@@ -3,7 +3,7 @@
 use std::fs;
 use std::process::Command;
 
-use crate::core::{Project, cherry_pick_to_head, commit_to_branch};
+use crate::core::{Project, commit_file_to_head, commit_to_branch};
 use crate::error::{ItackError, Result};
 use crate::storage::db::load_issue;
 
@@ -55,7 +55,7 @@ pub fn run(args: EditArgs) -> Result<()> {
         .to_path_buf();
 
     // Commit to data branch
-    let commit_oid = commit_to_branch(
+    commit_to_branch(
         &project.repo_root,
         data_branch,
         &relative_path,
@@ -63,10 +63,8 @@ pub fn run(args: EditArgs) -> Result<()> {
         &commit_message,
     )?;
 
-    // Cherry-pick onto current branch (updates working dir, index, and HEAD)
-    if let Some(oid) = commit_oid {
-        cherry_pick_to_head(&project.repo_root, oid, &commit_message)?;
-    }
+    // Commit to HEAD (stage and commit)
+    commit_file_to_head(&project.repo_root, &relative_path, &commit_message)?;
 
     Ok(())
 }

@@ -1,8 +1,8 @@
 //! itack create command.
 
-use crate::core::{Issue, Project, cherry_pick_to_head, commit_to_branch};
+use crate::core::{Issue, Project, commit_file_to_head, commit_to_branch};
 use crate::error::Result;
-use crate::storage::format_issue;
+use crate::storage::write_issue;
 
 /// Arguments for the create command.
 pub struct CreateArgs {
@@ -30,9 +30,9 @@ pub fn run(args: CreateArgs) -> Result<()> {
         .unwrap_or(&path)
         .to_path_buf();
 
-    // Format the issue content
+    // Write to working directory
     let body = args.body.as_deref().unwrap_or("");
-    let content = format_issue(&issue, &args.title, body)?;
+    write_issue(&path, &issue, &args.title, body)?;
 
     let commit_message = args
         .message
@@ -44,19 +44,20 @@ pub fn run(args: CreateArgs) -> Result<()> {
         .as_deref()
         .unwrap_or("data/itack");
 
+    // Read back the content for data branch commit
+    let content = std::fs::read(&path)?;
+
     // Commit to data branch
-    let commit_oid = commit_to_branch(
+    commit_to_branch(
         &project.repo_root,
         data_branch,
         &relative_path,
-        content.as_bytes(),
+        &content,
         &commit_message,
     )?;
 
-    // Cherry-pick onto current branch (updates working dir, index, and HEAD)
-    if let Some(oid) = commit_oid {
-        cherry_pick_to_head(&project.repo_root, oid, &commit_message)?;
-    }
+    // Commit to HEAD (stage and commit)
+    commit_file_to_head(&project.repo_root, &relative_path, &commit_message)?;
 
     println!("Created issue #{}: {}", id, args.title);
 

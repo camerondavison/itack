@@ -4,7 +4,7 @@ use std::path::Path;
 
 use git2::{FileMode, Oid, Repository, Signature};
 
-use crate::error::{ItackError, Result};
+use crate::error::Result;
 
 /// Commit a file to a specific branch without checking it out.
 /// Creates the branch as orphan if it doesn't exist.
@@ -107,84 +107,58 @@ fn build_nested_tree(
     Ok(())
 }
 
-/// Cherry-pick a commit onto the current HEAD branch.
-/// Updates working directory, index, and creates a new commit on HEAD.
-/// If HEAD is unborn (no commits yet), creates the first commit.
-pub fn cherry_pick_to_head(repo_path: &Path, commit_oid: Oid, message: &str) -> Result<Oid> {
+/// Commit a file to HEAD by staging it and creating a commit.
+/// The file must already exist in the working directory with the desired content.
+/// Returns None if there are no changes to commit.
+pub fn commit_file_to_head(
+    repo_path: &Path,
+    file_path: &Path,
+    message: &str,
+) -> Result<Option<Oid>> {
     let repo = Repository::discover(repo_path)?;
     let signature = repo
         .signature()
         .or_else(|_| Signature::now("itack", "itack@localhost"))?;
 
-    let commit = repo.find_commit(commit_oid)?;
+    // Stage the file
+    let mut index = repo.index()?;
+    index.add_path(file_path)?;
+    index.write()?;
 
-    // Check if HEAD exists (repo might have no commits yet)
-    let head_commit = match repo.head() {
+    // Check if there are staged changes by comparing index to HEAD
+    let head_tree = match repo.head() {
+        Ok(head) => Some(head.peel_to_tree()?),
+        Err(e) if e.code() == git2::ErrorCode::UnbornBranch => None,
+        Err(e) => return Err(e.into()),
+    };
+
+    let diff = repo.diff_tree_to_index(head_tree.as_ref(), Some(&index), None)?;
+    if diff.deltas().count() == 0 {
+        // No changes to commit
+        return Ok(None);
+    }
+
+    // Write the index as a tree
+    let tree_oid = index.write_tree()?;
+    let tree = repo.find_tree(tree_oid)?;
+
+    // Get the parent commit (if any)
+    let parent = match repo.head() {
         Ok(head) => Some(head.peel_to_commit()?),
         Err(e) if e.code() == git2::ErrorCode::UnbornBranch => None,
         Err(e) => return Err(e.into()),
     };
 
-    if head_commit.is_none() {
-        // No commits yet - just checkout the commit's tree and create first commit on HEAD
-        let tree = commit.tree()?;
-
-        // Update index to match the tree
-        let mut index = repo.index()?;
-        index.read_tree(&tree)?;
-        index.write()?;
-
-        // Checkout the tree to working directory
-        repo.checkout_tree(
-            tree.as_object(),
-            Some(git2::build::CheckoutBuilder::new().force()),
-        )?;
-
-        // Create the first commit on HEAD
-        let new_oid = repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            message,
-            &tree,
-            &[], // No parents for first commit
-        )?;
-
-        return Ok(new_oid);
-    }
-
-    let head = head_commit.unwrap();
-
-    // Cherry-pick: apply the commit's changes
-    repo.cherrypick(&commit, None)?;
-
-    // Check for conflicts
-    let index = repo.index()?;
-    if index.has_conflicts() {
-        repo.cleanup_state()?;
-        return Err(ItackError::MergeConflict(
-            "cherry-pick".to_string(),
-            "HEAD".to_string(),
-        ));
-    }
-
-    // Write the tree from the index
-    let mut index = repo.index()?;
-    let tree_oid = index.write_tree()?;
-    let tree = repo.find_tree(tree_oid)?;
-
     // Create the commit
-    let new_oid = repo.commit(
+    let parents: Vec<&git2::Commit> = parent.iter().collect();
+    let commit_oid = repo.commit(
         Some("HEAD"),
         &signature,
         &signature,
         message,
         &tree,
-        &[&head],
+        &parents,
     )?;
 
-    // Clean up cherry-pick state
-    repo.cleanup_state()?;
-
-    Ok(new_oid)
+    Ok(Some(commit_oid))
 }
