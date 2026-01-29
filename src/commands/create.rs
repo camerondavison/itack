@@ -1,6 +1,6 @@
 //! itack create command.
 
-use crate::core::{Issue, Project, commit_to_branch};
+use crate::core::{Issue, Project, cleanup_working_file, commit_to_branch};
 use crate::error::Result;
 use crate::storage::write_issue;
 
@@ -56,8 +56,8 @@ pub fn run(args: CreateArgs) -> Result<()> {
         &commit_message,
     )?;
 
-    // Delete from working directory (only exists in data branch until 'done')
-    std::fs::remove_file(&path)?;
+    // Restore file to HEAD state if it exists on this branch, otherwise delete
+    cleanup_working_file(&project.repo_root, &relative_path)?;
 
     println!("Created issue #{}: {}", id, args.title);
 

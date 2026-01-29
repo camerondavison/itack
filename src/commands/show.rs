@@ -1,6 +1,6 @@
 //! itack show command.
 
-use crate::core::Project;
+use crate::core::{Project, cleanup_working_file};
 use crate::error::Result;
 use crate::output::{self, OutputFormat};
 use crate::storage::db::load_issue_from_data_branch;
@@ -33,8 +33,13 @@ pub fn run(args: ShowArgs) -> Result<()> {
         }
     }
 
-    // Delete from working directory (only exists in data branch until 'done')
-    let _ = std::fs::remove_file(&issue_info.path);
+    // Restore file to HEAD state if it exists on this branch, otherwise delete
+    let relative_path = issue_info
+        .path
+        .strip_prefix(&project.repo_root)
+        .unwrap_or(&issue_info.path)
+        .to_path_buf();
+    let _ = cleanup_working_file(&project.repo_root, &relative_path);
 
     Ok(())
 }

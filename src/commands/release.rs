@@ -1,6 +1,6 @@
 //! itack release command.
 
-use crate::core::{Project, commit_to_branch};
+use crate::core::{Project, cleanup_working_file, commit_to_branch};
 use crate::error::Result;
 use crate::storage::db::load_issue_from_data_branch;
 use crate::storage::write_issue;
@@ -61,8 +61,8 @@ pub fn run(args: ReleaseArgs) -> Result<()> {
         &message,
     )?;
 
-    // Delete from working directory (only exists in data branch until 'done')
-    std::fs::remove_file(&issue_info.path)?;
+    // Restore file to HEAD state if it exists on this branch, otherwise delete
+    cleanup_working_file(&project.repo_root, &relative_path)?;
 
     if let Some(assignee) = old_assignee {
         println!("Released issue #{} from {}", args.id, assignee);

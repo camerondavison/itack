@@ -3,7 +3,9 @@
 use std::fs;
 use std::process::Command;
 
-use crate::core::{Project, commit_to_branch, find_issue_in_branch, read_file_from_branch};
+use crate::core::{
+    Project, cleanup_working_file, commit_to_branch, find_issue_in_branch, read_file_from_branch,
+};
 use crate::error::{ItackError, Result};
 use crate::storage::markdown::{format_issue, parse_issue};
 
@@ -71,8 +73,12 @@ pub fn run(args: EditArgs) -> Result<()> {
         // Read the edited content
         let edited = fs::read_to_string(&path)?;
 
-        // Delete from working directory
-        fs::remove_file(&path)?;
+        // Restore file to HEAD state if it exists on this branch, otherwise delete
+        let rel_path = path
+            .strip_prefix(&project.repo_root)
+            .unwrap_or(&path)
+            .to_path_buf();
+        let _ = cleanup_working_file(&project.repo_root, &rel_path);
 
         edited
     };

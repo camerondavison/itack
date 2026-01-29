@@ -188,6 +188,42 @@ pub fn find_issue_in_branch(
     Ok(None)
 }
 
+/// Clean up a file from the working directory after a data branch commit.
+/// If the file exists in HEAD (i.e., was committed on the current branch),
+/// restore it to the HEAD version so the working tree looks unchanged.
+/// If the file doesn't exist in HEAD, delete it from the working directory.
+pub fn cleanup_working_file(repo_path: &Path, file_path: &Path) -> Result<()> {
+    let repo = Repository::discover(repo_path)?;
+    let absolute_path = repo_path.join(file_path);
+
+    // Check if the file exists in HEAD
+    let head_content = match repo.head() {
+        Ok(head) => {
+            let tree = head.peel_to_tree()?;
+            match tree.get_path(file_path) {
+                Ok(entry) => {
+                    let blob = repo.find_blob(entry.id())?;
+                    Some(blob.content().to_vec())
+                }
+                Err(e) if e.code() == git2::ErrorCode::NotFound => None,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Err(e) if e.code() == git2::ErrorCode::UnbornBranch => None,
+        Err(e) => return Err(e.into()),
+    };
+
+    if let Some(content) = head_content {
+        // File exists in HEAD — restore to HEAD version
+        std::fs::write(&absolute_path, content)?;
+    } else {
+        // File doesn't exist in HEAD — delete it
+        std::fs::remove_file(&absolute_path)?;
+    }
+
+    Ok(())
+}
+
 /// Commit a file to HEAD by staging it and creating a commit.
 /// The file must already exist in the working directory with the desired content.
 /// Returns None if there are no changes to commit.

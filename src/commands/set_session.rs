@@ -1,6 +1,6 @@
 //! itack set-session command.
 
-use crate::core::{Project, commit_to_branch};
+use crate::core::{Project, cleanup_working_file, commit_to_branch};
 use crate::error::Result;
 use crate::storage::db::load_issue_from_data_branch;
 use crate::storage::write_issue;
@@ -56,8 +56,8 @@ pub fn run(args: SetSessionArgs) -> Result<()> {
         &message,
     )?;
 
-    // Delete from working directory (only exists in data branch)
-    std::fs::remove_file(&issue_info.path)?;
+    // Restore file to HEAD state if it exists on this branch, otherwise delete
+    cleanup_working_file(&project.repo_root, &relative_path)?;
 
     println!("Set session for issue #{} to {}", args.id, args.session);
 
