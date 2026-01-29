@@ -358,26 +358,21 @@ pub fn load_all_issues_from_data_branch(
 
     let mut issues = Vec::new();
 
-    let repo = match Repository::discover(repo_root) {
-        Ok(r) => r,
-        Err(_) => return Ok(issues),
-    };
+    let repo = Repository::discover(repo_root).map_err(|_| ItackError::NotInGitRepo)?;
 
     // Find the branch
     let branch_ref = format!("refs/heads/{}", data_branch);
-    let reference = match repo.find_reference(&branch_ref) {
-        Ok(r) => r,
-        Err(_) => return Ok(issues), // Branch doesn't exist yet
-    };
+    let reference = repo
+        .find_reference(&branch_ref)
+        .map_err(|_| ItackError::DataBranchNotFound(data_branch.to_string()))?;
 
     let commit = reference.peel_to_commit()?;
     let tree = commit.tree()?;
 
     // Look for .itack directory
-    let itack_entry = match tree.get_name(".itack") {
-        Some(entry) => entry,
-        None => return Ok(issues),
-    };
+    let itack_entry = tree
+        .get_name(".itack")
+        .ok_or_else(|| ItackError::DataBranchEmpty(data_branch.to_string()))?;
 
     let itack_tree = repo.find_tree(itack_entry.id())?;
 
@@ -388,16 +383,28 @@ pub fn load_all_issues_from_data_branch(
             && !name.starts_with('.')
         {
             let relative_path = std::path::PathBuf::from(".itack").join(name);
-            if let Some(content) = read_file_from_branch(repo_root, data_branch, &relative_path)?
-                && let Ok(content_str) = String::from_utf8(content)
-                && let Ok((issue, title, body)) = markdown::parse_issue(&content_str)
-            {
-                issues.push(IssueInfo {
-                    issue,
-                    title,
-                    body,
-                    path: repo_root.join(&relative_path),
-                });
+            match read_file_from_branch(repo_root, data_branch, &relative_path)? {
+                Some(content) => match String::from_utf8(content) {
+                    Ok(content_str) => match markdown::parse_issue(&content_str) {
+                        Ok((issue, title, body)) => {
+                            issues.push(IssueInfo {
+                                issue,
+                                title,
+                                body,
+                                path: repo_root.join(&relative_path),
+                            });
+                        }
+                        Err(e) => {
+                            eprintln!("Warning: failed to parse {}: {}", name, e);
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Warning: invalid UTF-8 in {}: {}", name, e);
+                    }
+                },
+                None => {
+                    eprintln!("Warning: could not read {} from data branch", name);
+                }
             }
         }
     }

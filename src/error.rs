@@ -34,6 +34,12 @@ pub enum ItackError {
     #[error("Issue {0} is already done")]
     AlreadyDone(u32),
 
+    #[error("Data branch '{0}' not found. Run 'itack init' to create it.")]
+    DataBranchNotFound(String),
+
+    #[error("No .itack directory found on data branch '{0}'. Run 'itack init' to repair.")]
+    DataBranchEmpty(String),
+
     #[error("Database not found at {0}. Run 'itack init' to fix.")]
     DatabaseNotFound(std::path::PathBuf),
 
