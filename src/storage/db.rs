@@ -16,6 +16,8 @@ const SCHEMA_VERSION: i32 = 1;
 pub struct Database {
     conn: Connection,
     issues_dir: std::path::PathBuf,
+    repo_root: Option<std::path::PathBuf>,
+    data_branch: Option<String>,
 }
 
 impl Database {
@@ -23,7 +25,12 @@ impl Database {
     ///
     /// The parent directory must already exist. Use `open_or_create` if you want
     /// to create the directory as well.
-    pub fn open(db_path: &Path, issues_dir: &Path) -> Result<Self> {
+    pub fn open(
+        db_path: &Path,
+        issues_dir: &Path,
+        repo_root: Option<&Path>,
+        data_branch: Option<&str>,
+    ) -> Result<Self> {
         // Check parent directory exists - don't auto-create
         if let Some(parent) = db_path.parent()
             && !parent.exists()
@@ -39,6 +46,8 @@ impl Database {
         let mut db = Database {
             conn,
             issues_dir: issues_dir.to_path_buf(),
+            repo_root: repo_root.map(|p| p.to_path_buf()),
+            data_branch: data_branch.map(|s| s.to_string()),
         };
 
         db.ensure_schema()?;
@@ -47,7 +56,12 @@ impl Database {
 
     /// Open or create the database, creating the parent directory if needed.
     /// Use this for `init` command only.
-    pub fn open_or_create(db_path: &Path, issues_dir: &Path) -> Result<Self> {
+    pub fn open_or_create(
+        db_path: &Path,
+        issues_dir: &Path,
+        repo_root: Option<&Path>,
+        data_branch: Option<&str>,
+    ) -> Result<Self> {
         if let Some(parent) = db_path.parent()
             && !parent.exists()
         {
@@ -60,6 +74,8 @@ impl Database {
         let mut db = Database {
             conn,
             issues_dir: issues_dir.to_path_buf(),
+            repo_root: repo_root.map(|p| p.to_path_buf()),
+            data_branch: data_branch.map(|s| s.to_string()),
         };
 
         db.ensure_schema()?;
@@ -95,8 +111,21 @@ impl Database {
         Ok(())
     }
 
+    /// Load issues from the data branch, if configured.
+    /// Returns an empty vec if repo_root/data_branch are not set or the branch doesn't exist.
+    fn load_data_branch_issues(&self) -> Vec<IssueInfo> {
+        if let (Some(repo_root), Some(data_branch)) = (&self.repo_root, &self.data_branch) {
+            load_all_issues_from_data_branch(repo_root, data_branch).unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Create the schema or rebuild it from markdown files.
     pub fn create_or_rebuild(&mut self) -> Result<()> {
+        // Load data branch issues before starting the transaction to avoid borrow conflicts
+        let data_branch_issues = self.load_data_branch_issues();
+
         // Use EXCLUSIVE transaction for rebuild
         let tx = self
             .conn
@@ -163,6 +192,18 @@ impl Database {
             }
         }
 
+        // Also scan data branch for the true max ID and claims
+        for info in &data_branch_issues {
+            max_id = max_id.max(info.issue.id);
+
+            if let Some(assignee) = &info.issue.assignee {
+                tx.execute(
+                    "INSERT OR REPLACE INTO claims (issue_id, assignee, claimed_at) VALUES (?1, ?2, ?3)",
+                    params![info.issue.id, assignee, info.issue.created.to_rfc3339()],
+                )?;
+            }
+        }
+
         // Set next_issue_id to max + 1
         tx.execute(
             "INSERT INTO state (id, next_issue_id) VALUES (1, ?1)",
@@ -176,6 +217,9 @@ impl Database {
     /// Repair state tables (claims and next_issue_id) by rescanning issue files.
     /// Unlike create_or_rebuild, this always runs regardless of schema version.
     pub fn repair_state(&mut self) -> Result<()> {
+        // Load data branch issues before starting the transaction to avoid borrow conflicts
+        let data_branch_issues = self.load_data_branch_issues();
+
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Exclusive)?;
@@ -205,6 +249,18 @@ impl Database {
                             )?;
                     }
                 }
+            }
+        }
+
+        // Also scan data branch for the true max ID and claims
+        for info in &data_branch_issues {
+            max_id = max_id.max(info.issue.id);
+
+            if let Some(assignee) = &info.issue.assignee {
+                tx.execute(
+                    "INSERT OR REPLACE INTO claims (issue_id, assignee, claimed_at) VALUES (?1, ?2, ?3)",
+                    params![info.issue.id, assignee, info.issue.created.to_rfc3339()],
+                )?;
             }
         }
 
@@ -557,7 +613,7 @@ mod tests {
         let db_path = dir.path().join("itack.db");
         let issues_dir = dir.path().join(".itack");
         fs::create_dir_all(&issues_dir).unwrap();
-        let db = Database::open(&db_path, &issues_dir).unwrap();
+        let db = Database::open(&db_path, &issues_dir, None, None).unwrap();
         (dir, db)
     }
 
