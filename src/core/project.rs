@@ -79,7 +79,13 @@ impl Project {
 
     /// Open the database for this project.
     pub fn open_db(&self) -> Result<Database> {
-        Database::open(&self.db_path, &self.itack_dir)
+        let data_branch = self.config.data_branch.as_deref();
+        Database::open(
+            &self.db_path,
+            &self.itack_dir,
+            Some(&self.repo_root),
+            data_branch,
+        )
     }
 
     /// Get the path to an issue file (new format: YYYY-MM-DD-issue-NNN.md).

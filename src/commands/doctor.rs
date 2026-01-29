@@ -92,7 +92,13 @@ pub fn run() -> Result<()> {
 
 /// Check the database schema version.
 fn check_schema_version(project: &Project) -> Result<i32> {
-    let db = Database::open(&project.db_path, &project.itack_dir)?;
+    let data_branch = project.config.data_branch.as_deref();
+    let db = Database::open(
+        &project.db_path,
+        &project.itack_dir,
+        Some(&project.repo_root),
+        data_branch,
+    )?;
     db.get_schema_version()
 }
 
@@ -114,7 +120,12 @@ impl SyncCheckResult {
 
 /// Check if issues in data branch match what the database knows about.
 fn check_issue_sync(project: &Project, data_branch: &str) -> Result<SyncCheckResult> {
-    let db = Database::open(&project.db_path, &project.itack_dir)?;
+    let db = Database::open(
+        &project.db_path,
+        &project.itack_dir,
+        Some(&project.repo_root),
+        Some(data_branch),
+    )?;
 
     // Get all issues from data branch
     let issues = load_all_issues_from_data_branch(&project.repo_root, data_branch)?;

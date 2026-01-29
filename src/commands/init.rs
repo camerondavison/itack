@@ -33,7 +33,13 @@ pub fn run() -> Result<()> {
 
     // Open database to initialize it (use open_or_create for init)
     let project = Project::discover()?;
-    let _db = Database::open_or_create(&project.db_path, &project.itack_dir)?;
+    let data_branch = project.config.data_branch.as_deref();
+    let _db = Database::open_or_create(
+        &project.db_path,
+        &project.itack_dir,
+        Some(&project.repo_root),
+        data_branch,
+    )?;
 
     println!("Initialized itack project: {}", metadata.project_id);
     println!("Issues will be stored in: .itack/");
@@ -55,7 +61,13 @@ fn repair_database() -> Result<()> {
     migrate_to_data_branch(&project)?;
 
     // Use open_or_create to ensure directory and DB exist
-    let mut db = Database::open_or_create(&project.db_path, &project.itack_dir)?;
+    let data_branch = project.config.data_branch.as_deref();
+    let mut db = Database::open_or_create(
+        &project.db_path,
+        &project.itack_dir,
+        Some(&project.repo_root),
+        data_branch,
+    )?;
 
     // Always repair state to sync with issue files
     db.repair_state()?;
