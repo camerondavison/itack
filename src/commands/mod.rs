@@ -11,6 +11,7 @@ pub mod init;
 pub mod list;
 pub mod release;
 pub mod search;
+pub mod set_session;
 pub mod show;
 
 use crate::cli::{Cli, Commands};
@@ -58,6 +59,10 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         }),
 
         Commands::Release { id } => release::run(release::ReleaseArgs { id }),
+
+        Commands::SetSession { id, session } => {
+            set_session::run(set_session::SetSessionArgs { id, session })
+        }
 
         Commands::List {
             status,

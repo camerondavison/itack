@@ -86,6 +86,15 @@ pub enum Commands {
         id: u32,
     },
 
+    /// Set the session for an issue
+    SetSession {
+        /// Issue ID
+        id: u32,
+
+        /// Session name (e.g., ccx session name)
+        session: String,
+    },
+
     /// List issues
     List {
         /// Filter by status
