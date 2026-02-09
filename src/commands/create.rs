@@ -10,6 +10,7 @@ pub struct CreateArgs {
     pub epic: Option<String>,
     pub body: Option<String>,
     pub message: Option<String>,
+    pub depends_on: Vec<u32>,
 }
 
 /// Create a new issue.
@@ -21,7 +22,8 @@ pub fn run(args: CreateArgs) -> Result<()> {
     let id = db.next_issue_id()?;
 
     // Create the issue (title is stored in markdown, not in Issue struct)
-    let issue = Issue::with_epic(id, args.epic);
+    let mut issue = Issue::with_epic(id, args.epic);
+    issue.depends_on = args.depends_on;
 
     // Get the relative path for the git tree
     let relative_path = Project::issue_relative_path(id, &issue.created);

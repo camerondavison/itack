@@ -35,6 +35,10 @@ pub enum Commands {
         /// Custom git commit message (defaults to "Create issue #N: <title>")
         #[arg(short, long)]
         message: Option<String>,
+
+        /// Issue IDs this issue depends on (comma-separated)
+        #[arg(short, long, value_delimiter = ',')]
+        depends_on: Vec<u32>,
     },
 
     /// Show issue details
@@ -84,6 +88,24 @@ pub enum Commands {
     Release {
         /// Issue ID
         id: u32,
+    },
+
+    /// Add dependencies to an issue
+    Depend {
+        /// Issue ID
+        id: u32,
+
+        /// Dependency issue IDs to add
+        deps: Vec<u32>,
+    },
+
+    /// Remove dependencies from an issue
+    Undepend {
+        /// Issue ID
+        id: u32,
+
+        /// Dependency issue IDs to remove
+        deps: Vec<u32>,
     },
 
     /// Set the session for an issue

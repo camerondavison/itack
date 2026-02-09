@@ -60,6 +60,9 @@ itack create "Issue title" --body "Detailed description"
 
 # Create with a custom commit message
 itack create "Issue title" --message "Custom commit message"
+
+# Create with dependencies on other issues
+itack create "Issue title" --depends-on 1,2,3
 ```
 
 ### Work on Issues
@@ -91,6 +94,17 @@ itack edit <id> --body "New description"
 
 # Edit with a custom commit message
 itack edit <id> --message "Custom commit message"
+```
+
+### Manage Dependencies
+
+```bash
+# Add dependencies to an issue
+itack depend <id> <dep-id>         # issue depends on dep-id
+itack depend <id> <dep1> <dep2>    # issue depends on dep1 and dep2
+
+# Remove dependencies from an issue
+itack undepend <id> <dep-id>
 ```
 
 ### Diagnose Issues
