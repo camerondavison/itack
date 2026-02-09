@@ -2,7 +2,6 @@
 
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
-use std::fs;
 use std::path::Path;
 
 use crate::core::Issue;
@@ -15,7 +14,6 @@ const SCHEMA_VERSION: i32 = 1;
 /// SQLite database handle for itack.
 pub struct Database {
     conn: Connection,
-    issues_dir: std::path::PathBuf,
     repo_root: Option<std::path::PathBuf>,
     data_branch: Option<String>,
 }
@@ -27,7 +25,6 @@ impl Database {
     /// to create the directory as well.
     pub fn open(
         db_path: &Path,
-        issues_dir: &Path,
         repo_root: Option<&Path>,
         data_branch: Option<&str>,
     ) -> Result<Self> {
@@ -45,7 +42,6 @@ impl Database {
 
         let mut db = Database {
             conn,
-            issues_dir: issues_dir.to_path_buf(),
             repo_root: repo_root.map(|p| p.to_path_buf()),
             data_branch: data_branch.map(|s| s.to_string()),
         };
@@ -58,14 +54,13 @@ impl Database {
     /// Use this for `init` command only.
     pub fn open_or_create(
         db_path: &Path,
-        issues_dir: &Path,
         repo_root: Option<&Path>,
         data_branch: Option<&str>,
     ) -> Result<Self> {
         if let Some(parent) = db_path.parent()
             && !parent.exists()
         {
-            fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent)?;
         }
 
         let conn = Connection::open(db_path)?;
@@ -73,7 +68,6 @@ impl Database {
 
         let mut db = Database {
             conn,
-            issues_dir: issues_dir.to_path_buf(),
             repo_root: repo_root.map(|p| p.to_path_buf()),
             data_branch: data_branch.map(|s| s.to_string()),
         };
@@ -168,31 +162,9 @@ impl Database {
             "#,
         )?;
 
-        // Scan .itack/*.md files to rebuild state
+        // Scan data branch for max ID and claims
         let mut max_id: u32 = 0;
 
-        if self.issues_dir.exists() {
-            for entry in fs::read_dir(&self.issues_dir)? {
-                let entry = entry?;
-                let path = entry.path();
-
-                if path.extension().map(|e| e == "md").unwrap_or(false)
-                    && let Ok((issue, _, _)) = markdown::read_issue(&path)
-                {
-                    max_id = max_id.max(issue.id);
-
-                    // Rebuild claims from assignee field
-                    if let Some(assignee) = &issue.assignee {
-                        tx.execute(
-                                "INSERT OR REPLACE INTO claims (issue_id, assignee, claimed_at) VALUES (?1, ?2, ?3)",
-                                params![issue.id, assignee, issue.created.to_rfc3339()],
-                            )?;
-                    }
-                }
-            }
-        }
-
-        // Also scan data branch for the true max ID and claims
         for info in &data_branch_issues {
             max_id = max_id.max(info.issue.id);
 
@@ -228,31 +200,9 @@ impl Database {
         tx.execute("DELETE FROM claims", [])?;
         tx.execute("DELETE FROM state", [])?;
 
-        // Scan .itack/*.md files to rebuild state
+        // Scan data branch for max ID and claims
         let mut max_id: u32 = 0;
 
-        if self.issues_dir.exists() {
-            for entry in fs::read_dir(&self.issues_dir)? {
-                let entry = entry?;
-                let path = entry.path();
-
-                if path.extension().map(|e| e == "md").unwrap_or(false)
-                    && let Ok((issue, _, _)) = markdown::read_issue(&path)
-                {
-                    max_id = max_id.max(issue.id);
-
-                    // Rebuild claims from assignee field
-                    if let Some(assignee) = &issue.assignee {
-                        tx.execute(
-                                "INSERT OR REPLACE INTO claims (issue_id, assignee, claimed_at) VALUES (?1, ?2, ?3)",
-                                params![issue.id, assignee, issue.created.to_rfc3339()],
-                            )?;
-                    }
-                }
-            }
-        }
-
-        // Also scan data branch for the true max ID and claims
         for info in &data_branch_issues {
             max_id = max_id.max(info.issue.id);
 
@@ -401,7 +351,8 @@ pub struct IssueInfo {
     pub issue: Issue,
     pub title: String,
     pub body: String,
-    pub path: std::path::PathBuf,
+    /// Relative path in the git tree (e.g. `.itack/2026-01-25-issue-001.md`).
+    pub relative_path: std::path::PathBuf,
 }
 
 /// Load all issues from the data branch.
@@ -447,7 +398,7 @@ pub fn load_all_issues_from_data_branch(
                                 issue,
                                 title,
                                 body,
-                                path: repo_root.join(&relative_path),
+                                relative_path: relative_path.clone(),
                             });
                         }
                         Err(e) => {
@@ -482,61 +433,10 @@ pub fn load_all_issues_from_data_branch(
     Ok(issues)
 }
 
-/// Load all issues from the issues directory (working directory).
-/// Note: Prefer `load_all_issues_from_data_branch` to get the latest version.
-#[allow(dead_code)]
-pub fn load_all_issues(issues_dir: &Path) -> Result<Vec<IssueInfo>> {
-    let mut issues = Vec::new();
-
-    if !issues_dir.exists() {
-        return Ok(issues);
-    }
-
-    for entry in fs::read_dir(issues_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.extension().map(|e| e == "md").unwrap_or(false) {
-            match markdown::read_issue(&path) {
-                Ok((issue, title, body)) => {
-                    issues.push(IssueInfo {
-                        issue,
-                        title,
-                        body,
-                        path,
-                    });
-                }
-                Err(_) => {
-                    // Skip invalid files
-                    continue;
-                }
-            }
-        }
-    }
-
-    // Sort by status priority, then by ID
-    issues.sort_by(|a, b| {
-        let status_cmp = a
-            .issue
-            .status
-            .sort_priority()
-            .cmp(&b.issue.status.sort_priority());
-        if status_cmp == std::cmp::Ordering::Equal {
-            a.issue.id.cmp(&b.issue.id)
-        } else {
-            status_cmp
-        }
-    });
-
-    Ok(issues)
-}
-
-/// Load a single issue by ID from the data branch and sync to working directory.
-/// This is the preferred method for loading issues when you need the latest version.
+/// Load a single issue by ID from the data branch.
 /// The data branch is the source of truth for issue content.
 pub fn load_issue_from_data_branch(
     repo_root: &Path,
-    _issues_dir: &Path,
     data_branch: &str,
     id: u32,
 ) -> Result<IssueInfo> {
@@ -550,14 +450,6 @@ pub fn load_issue_from_data_branch(
     let content = read_file_from_branch(repo_root, data_branch, &relative_path)?
         .ok_or(ItackError::IssueNotFound(id))?;
 
-    let path = repo_root.join(&relative_path);
-
-    // Ensure parent directory exists and write to working directory
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&path, &content)?;
-
     // Parse the issue
     let content_str = String::from_utf8(content)
         .map_err(|e| ItackError::Other(format!("Invalid UTF-8: {}", e)))?;
@@ -567,46 +459,7 @@ pub fn load_issue_from_data_branch(
         issue,
         title,
         body,
-        path,
-    })
-}
-
-/// Load a single issue by ID from the working directory.
-/// Checks both new format (YYYY-MM-DD-issue-NNN.md) and old format (N.md).
-/// Note: Prefer `load_issue_from_data_branch` to get the latest version.
-#[allow(dead_code)]
-pub fn load_issue(issues_dir: &Path, id: u32) -> Result<IssueInfo> {
-    // Check for new format files first (pattern: *-issue-{id:03}.md)
-    let suffix = format!("-issue-{:03}.md", id);
-    if let Ok(entries) = fs::read_dir(issues_dir) {
-        for entry in entries.flatten() {
-            let filename = entry.file_name();
-            let filename_str = filename.to_string_lossy();
-            if filename_str.ends_with(&suffix) {
-                let path = entry.path();
-                let (issue, title, body) = markdown::read_issue(&path)?;
-                return Ok(IssueInfo {
-                    issue,
-                    title,
-                    body,
-                    path,
-                });
-            }
-        }
-    }
-
-    // Fall back to old format
-    let path = issues_dir.join(format!("{}.md", id));
-    if !path.exists() {
-        return Err(ItackError::IssueNotFound(id));
-    }
-
-    let (issue, title, body) = markdown::read_issue(&path)?;
-    Ok(IssueInfo {
-        issue,
-        title,
-        body,
-        path,
+        relative_path,
     })
 }
 
@@ -618,9 +471,7 @@ mod tests {
     fn setup_test_db() -> (TempDir, Database) {
         let dir = TempDir::new().unwrap();
         let db_path = dir.path().join("itack.db");
-        let issues_dir = dir.path().join(".itack");
-        fs::create_dir_all(&issues_dir).unwrap();
-        let db = Database::open(&db_path, &issues_dir, None, None).unwrap();
+        let db = Database::open(&db_path, None, None).unwrap();
         (dir, db)
     }
 

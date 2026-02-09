@@ -1,9 +1,9 @@
 //! itack done command.
 
-use crate::core::{Project, Status, commit_file_to_head, commit_to_branch};
+use crate::core::{Project, Status, commit_to_branch};
 use crate::error::{ItackError, Result};
 use crate::storage::db::load_issue_from_data_branch;
-use crate::storage::write_issue;
+use crate::storage::markdown::format_issue;
 
 /// Arguments for the done command.
 pub struct DoneArgs {
@@ -19,9 +19,8 @@ pub fn run(args: DoneArgs) -> Result<()> {
         .as_deref()
         .unwrap_or("data/itack");
 
-    // Load issue from data branch (source of truth) and sync to working directory
-    let mut issue_info =
-        load_issue_from_data_branch(&project.repo_root, &project.itack_dir, data_branch, args.id)?;
+    // Load issue from data branch (source of truth)
+    let mut issue_info = load_issue_from_data_branch(&project.repo_root, data_branch, args.id)?;
 
     if issue_info.issue.status == Status::Done {
         return Err(ItackError::AlreadyDone(args.id));
@@ -30,36 +29,16 @@ pub fn run(args: DoneArgs) -> Result<()> {
     let old_status = issue_info.issue.status;
     issue_info.issue.status = Status::Done;
 
-    // Get relative path for commit
-    let relative_path = issue_info
-        .path
-        .strip_prefix(&project.repo_root)
-        .unwrap_or(&issue_info.path)
-        .to_path_buf();
-
-    // Write to working directory
-    write_issue(
-        &issue_info.path,
-        &issue_info.issue,
-        &issue_info.title,
-        &issue_info.body,
-    )?;
-
-    // Read back the content for data branch commit
-    let content = std::fs::read(&issue_info.path)?;
-
-    // Commit to data branch
+    // Format issue content in memory and commit directly to data branch
+    let content = format_issue(&issue_info.issue, &issue_info.title, &issue_info.body)?;
     let message = format!("Mark issue #{} as done", args.id);
     commit_to_branch(
         &project.repo_root,
         data_branch,
-        &relative_path,
-        &content,
+        &issue_info.relative_path,
+        content.as_bytes(),
         &message,
     )?;
-
-    // Commit to HEAD (stage and commit)
-    commit_file_to_head(&project.repo_root, &relative_path, &message)?;
 
     println!(
         "Updated issue #{} status: {} -> {}",

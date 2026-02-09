@@ -1,8 +1,5 @@
 //! Markdown file I/O with YAML front matter.
 
-use std::fs;
-use std::path::Path;
-
 use crate::core::Issue;
 use crate::error::{ItackError, Result};
 
@@ -53,24 +50,6 @@ fn extract_title_heading(body: &str) -> Result<(String, String)> {
     }
 }
 
-/// Check if a markdown file has the title heading after frontmatter.
-pub fn has_title_heading(content: &str) -> bool {
-    let content = content.trim_start();
-    if !content.starts_with(FRONT_MATTER_DELIMITER) {
-        return false;
-    }
-
-    let after_first = &content[FRONT_MATTER_DELIMITER.len()..];
-    let Some(end_pos) = after_first.find(FRONT_MATTER_DELIMITER) else {
-        return false;
-    };
-
-    let body_start = FRONT_MATTER_DELIMITER.len() + end_pos + FRONT_MATTER_DELIMITER.len();
-    let body = content[body_start..].trim_start_matches('\n');
-
-    body.starts_with("# ")
-}
-
 /// Format an issue as markdown with YAML front matter.
 /// The title is stored as an H1 heading in the body, not in YAML.
 pub fn format_issue(issue: &Issue, title: &str, body: &str) -> Result<String> {
@@ -98,15 +77,17 @@ pub fn format_issue(issue: &Issue, title: &str, body: &str) -> Result<String> {
 
 /// Read an issue from a markdown file.
 /// Returns the issue, title, and body.
-pub fn read_issue(path: &Path) -> Result<(Issue, String, String)> {
-    let content = fs::read_to_string(path)?;
+#[cfg(test)]
+fn read_issue(path: &std::path::Path) -> Result<(Issue, String, String)> {
+    let content = std::fs::read_to_string(path)?;
     parse_issue(&content)
 }
 
 /// Write an issue to a markdown file.
-pub fn write_issue(path: &Path, issue: &Issue, title: &str, body: &str) -> Result<()> {
+#[cfg(test)]
+fn write_issue(path: &std::path::Path, issue: &Issue, title: &str, body: &str) -> Result<()> {
     let content = format_issue(issue, title, body)?;
-    fs::write(path, content)?;
+    std::fs::write(path, content)?;
     Ok(())
 }
 

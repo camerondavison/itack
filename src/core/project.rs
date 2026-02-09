@@ -10,9 +10,9 @@ use crate::storage::{Database, Metadata};
 /// Project context for itack operations.
 pub struct Project {
     /// Root directory of the git repository.
-    #[allow(dead_code)]
     pub repo_root: PathBuf,
     /// Path to .itack directory.
+    #[allow(dead_code)]
     pub itack_dir: PathBuf,
     /// Path to the SQLite database (in global config dir).
     pub db_path: PathBuf,
@@ -80,24 +80,14 @@ impl Project {
     /// Open the database for this project.
     pub fn open_db(&self) -> Result<Database> {
         let data_branch = self.config.data_branch.as_deref();
-        Database::open(
-            &self.db_path,
-            &self.itack_dir,
-            Some(&self.repo_root),
-            data_branch,
-        )
+        Database::open(&self.db_path, Some(&self.repo_root), data_branch)
     }
 
-    /// Get the path to an issue file (new format: YYYY-MM-DD-issue-NNN.md).
+    /// Get the relative path to an issue file (e.g. `.itack/2026-01-25-issue-001.md`).
     /// Requires the creation date to generate the filename.
-    pub fn issue_path_with_date(
-        &self,
-        id: u32,
-        created: &chrono::DateTime<chrono::Utc>,
-    ) -> PathBuf {
+    pub fn issue_relative_path(id: u32, created: &chrono::DateTime<chrono::Utc>) -> PathBuf {
         let date_str = created.format("%Y-%m-%d").to_string();
-        self.itack_dir
-            .join(format!("{}-issue-{:03}.md", date_str, id))
+        PathBuf::from(".itack").join(format!("{}-issue-{:03}.md", date_str, id))
     }
 
     /// Get the current git branch name.

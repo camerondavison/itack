@@ -1,11 +1,9 @@
 //! itack edit command.
 
-use std::fs;
+use std::io::Write;
 use std::process::Command;
 
-use crate::core::{
-    Project, cleanup_working_file, commit_to_branch, find_issue_in_branch, read_file_from_branch,
-};
+use crate::core::{Project, commit_to_branch, find_issue_in_branch, read_file_from_branch};
 use crate::error::{ItackError, Result};
 use crate::storage::markdown::{format_issue, parse_issue};
 
@@ -34,8 +32,6 @@ pub fn run(args: EditArgs) -> Result<()> {
     let relative_path = find_issue_in_branch(&project.repo_root, data_branch, args.id)?
         .ok_or(ItackError::IssueNotFound(args.id))?;
 
-    let path = project.repo_root.join(&relative_path);
-
     // Read the latest content from the data branch
     let current_content_bytes =
         read_file_from_branch(&project.repo_root, data_branch, &relative_path)?
@@ -48,18 +44,23 @@ pub fn run(args: EditArgs) -> Result<()> {
         let (issue, title, _old_body) = parse_issue(&current_content)?;
         format_issue(&issue, &title, &new_body)?
     } else {
-        // Editor-based workflow
+        // Editor-based workflow using a temp file
         let editor = project.config.get_editor();
 
-        // Sync to working directory for editing
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&path, &current_content)?;
+        let mut temp_file = tempfile::Builder::new()
+            .suffix(".md")
+            .tempfile()
+            .map_err(|e| ItackError::Other(format!("Failed to create temp file: {}", e)))?;
+
+        temp_file
+            .write_all(current_content.as_bytes())
+            .map_err(|e| ItackError::Other(format!("Failed to write temp file: {}", e)))?;
+
+        let temp_path = temp_file.path().to_path_buf();
 
         // Open editor
         let status = Command::new(&editor)
-            .arg(&path)
+            .arg(&temp_path)
             .status()
             .map_err(|e| ItackError::EditorFailed(format!("Failed to launch {}: {}", editor, e)))?;
 
@@ -71,25 +72,10 @@ pub fn run(args: EditArgs) -> Result<()> {
         }
 
         // Read the edited content
-        let edited = fs::read_to_string(&path)?;
-
-        // Restore file to HEAD state if it exists on this branch, otherwise delete
-        let rel_path = path
-            .strip_prefix(&project.repo_root)
-            .unwrap_or(&path)
-            .to_path_buf();
-        let _ = cleanup_working_file(&project.repo_root, &rel_path);
-
-        edited
+        std::fs::read_to_string(&temp_path)?
     };
 
-    // Get relative path for commit
-    let relative_path = path
-        .strip_prefix(&project.repo_root)
-        .unwrap_or(&path)
-        .to_path_buf();
-
-    // Commit to data branch only (feature branches get updated on 'done')
+    // Commit to data branch only
     commit_to_branch(
         &project.repo_root,
         data_branch,

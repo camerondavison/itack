@@ -1,8 +1,8 @@
 //! itack create command.
 
-use crate::core::{Issue, Project, cleanup_working_file, commit_to_branch};
+use crate::core::{Issue, Project, commit_to_branch};
 use crate::error::Result;
-use crate::storage::write_issue;
+use crate::storage::markdown::format_issue;
 
 /// Arguments for the create command.
 pub struct CreateArgs {
@@ -23,16 +23,12 @@ pub fn run(args: CreateArgs) -> Result<()> {
     // Create the issue (title is stored in markdown, not in Issue struct)
     let issue = Issue::with_epic(id, args.epic);
 
-    // Get the file path (relative to repo root)
-    let path = project.issue_path_with_date(id, &issue.created);
-    let relative_path = path
-        .strip_prefix(&project.repo_root)
-        .unwrap_or(&path)
-        .to_path_buf();
+    // Get the relative path for the git tree
+    let relative_path = Project::issue_relative_path(id, &issue.created);
 
-    // Write to working directory
+    // Format issue content in memory
     let body = args.body.as_deref().unwrap_or("");
-    write_issue(&path, &issue, &args.title, body)?;
+    let content = format_issue(&issue, &args.title, body)?;
 
     let commit_message = args
         .message
@@ -44,20 +40,14 @@ pub fn run(args: CreateArgs) -> Result<()> {
         .as_deref()
         .unwrap_or("data/itack");
 
-    // Read back the content for data branch commit
-    let content = std::fs::read(&path)?;
-
-    // Commit to data branch only (feature branches get updated on 'done')
+    // Commit directly to data branch
     commit_to_branch(
         &project.repo_root,
         data_branch,
         &relative_path,
-        &content,
+        content.as_bytes(),
         &commit_message,
     )?;
-
-    // Restore file to HEAD state if it exists on this branch, otherwise delete
-    cleanup_working_file(&project.repo_root, &relative_path)?;
 
     println!("Created issue #{}: {}", id, args.title);
 
