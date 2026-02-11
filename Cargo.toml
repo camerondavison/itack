@@ -2,6 +2,13 @@
 name = "itack"
 version = "0.1.0"
 edition = "2024"
+description = "Git-backed issue tracker for multi-agent coordination"
+license = "MIT"
+repository = "https://github.com/camerondavison/itack"
+readme = "README.md"
+authors = ["Cameron Davison"]
+keywords = ["issue-tracker", "git", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
