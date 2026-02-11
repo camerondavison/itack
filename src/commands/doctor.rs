@@ -1,11 +1,13 @@
 //! itack doctor command - diagnose database and issue sync issues.
 
 use std::collections::HashSet;
+use std::fs;
 
 use crate::core::{Project, Status};
 use crate::error::Result;
 use crate::storage::Database;
 use crate::storage::db::load_all_issues_from_data_branch;
+use crate::storage::markdown;
 
 /// Expected schema version (must match SCHEMA_VERSION in db.rs).
 const EXPECTED_SCHEMA_VERSION: i32 = 1;
@@ -78,6 +80,30 @@ pub fn run() -> Result<()> {
         }
     }
 
+    // Check 3: Stray issue files in working directory
+    println!("\nChecking for stray issue files in working directory...");
+    match find_stray_issue_files(&project) {
+        Ok(stray_files) => {
+            if stray_files.is_empty() {
+                println!("  ✓ No stray issue files found");
+            } else {
+                has_issues = true;
+                println!(
+                    "  ✗ Found {} stray issue file(s) in .itack/:",
+                    stray_files.len()
+                );
+                for file in &stray_files {
+                    println!("    - {}", file);
+                }
+                println!("    Run 'itack init' to migrate them to the data branch.");
+            }
+        }
+        Err(e) => {
+            println!("  ✗ Could not check for stray files: {}", e);
+            has_issues = true;
+        }
+    }
+
     // Summary
     println!();
     if has_issues {
@@ -88,6 +114,36 @@ pub fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Find stray .itack/*.md issue files in the working directory.
+fn find_stray_issue_files(project: &Project) -> Result<Vec<String>> {
+    let itack_dir = project.repo_root.join(".itack");
+    if !itack_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut stray_files = Vec::new();
+    for entry in fs::read_dir(&itack_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        if markdown::parse_issue(&content).is_ok() {
+            stray_files.push(path.file_name().unwrap().to_string_lossy().to_string());
+        }
+    }
+
+    stray_files.sort();
+    Ok(stray_files)
 }
 
 /// Check the database schema version.
