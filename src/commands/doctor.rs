@@ -1,12 +1,12 @@
 //! itack doctor command - diagnose database and issue sync issues.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 
-use crate::core::{Project, Status};
+use crate::core::{Project, Status, commit_to_branch, remove_file_from_branch};
 use crate::error::Result;
 use crate::storage::Database;
-use crate::storage::db::load_all_issues_from_data_branch;
+use crate::storage::db::{IssueInfo, load_all_issues_from_data_branch};
 use crate::storage::markdown;
 
 /// Expected schema version (must match SCHEMA_VERSION in db.rs).
@@ -80,7 +80,38 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Check 3: Stray issue files in working directory
+    // Check 3: Duplicate issue IDs
+    println!("\nChecking for duplicate issue IDs...");
+    match check_duplicate_ids(&project, data_branch) {
+        Ok(duplicates) => {
+            if duplicates.is_empty() {
+                println!("  ✓ No duplicate issue IDs found");
+            } else {
+                has_issues = true;
+                println!(
+                    "  ✗ Found {} issue(s) with duplicate IDs, renumbering...",
+                    duplicates.len()
+                );
+                match fix_duplicate_ids(&project, data_branch, &duplicates) {
+                    Ok(renames) => {
+                        for (old_id, new_id, title) in &renames {
+                            println!("    Renumbered #{} → #{}: {}", old_id, new_id, title);
+                        }
+                        println!("    Run 'itack init' to rebuild the database.");
+                    }
+                    Err(e) => {
+                        println!("  ✗ Failed to fix duplicates: {}", e);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            println!("  ✗ Could not check for duplicates: {}", e);
+            has_issues = true;
+        }
+    }
+
+    // Check 4: Stray issue files in working directory
     println!("\nChecking for stray issue files in working directory...");
     match find_stray_issue_files(&project) {
         Ok(stray_files) => {
@@ -216,4 +247,74 @@ fn check_issue_sync(project: &Project, data_branch: &str) -> Result<SyncCheckRes
         orphan_claims,
         next_id_issue,
     })
+}
+
+/// Find issues that share the same ID.
+/// Returns the duplicate entries (the second+ occurrence for each ID, sorted by file path).
+fn check_duplicate_ids(project: &Project, data_branch: &str) -> Result<Vec<IssueInfo>> {
+    let issues = load_all_issues_from_data_branch(&project.repo_root, data_branch)?;
+
+    // Group by ID, keeping insertion order via Vec
+    let mut seen: HashMap<u32, usize> = HashMap::new();
+    let mut duplicates = Vec::new();
+
+    // Sort by relative_path so the first file alphabetically is kept as canonical
+    let mut sorted = issues;
+    sorted.sort_by(|a, b| a.relative_path.cmp(&b.relative_path));
+
+    for info in sorted {
+        let count = seen.entry(info.issue.id).or_insert(0);
+        *count += 1;
+        if *count > 1 {
+            duplicates.push(info);
+        }
+    }
+
+    Ok(duplicates)
+}
+
+/// Fix duplicate IDs by renumbering each duplicate to a new ID.
+/// Returns a list of (old_id, new_id, title) for each renumbered issue.
+fn fix_duplicate_ids(
+    project: &Project,
+    data_branch: &str,
+    duplicates: &[IssueInfo],
+) -> Result<Vec<(u32, u32, String)>> {
+    let db = project.open_db()?;
+    let mut renames = Vec::new();
+
+    for dup in duplicates {
+        let new_id = db.next_issue_id()?;
+
+        // Create new issue with the new ID
+        let mut new_issue = dup.issue.clone();
+        new_issue.id = new_id;
+
+        let new_path = Project::issue_relative_path(new_id, &new_issue.created);
+        let content = markdown::format_issue(&new_issue, &dup.title, &dup.body)?;
+
+        // Write the new file
+        commit_to_branch(
+            &project.repo_root,
+            data_branch,
+            &new_path,
+            content.as_bytes(),
+            &format!(
+                "Renumber duplicate #{} → #{}: {}",
+                dup.issue.id, new_id, dup.title
+            ),
+        )?;
+
+        // Remove the old file
+        remove_file_from_branch(
+            &project.repo_root,
+            data_branch,
+            &dup.relative_path,
+            &format!("Remove duplicate file {}", dup.relative_path.display()),
+        )?;
+
+        renames.push((dup.issue.id, new_id, dup.title.clone()));
+    }
+
+    Ok(renames)
 }

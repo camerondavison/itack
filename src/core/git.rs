@@ -141,6 +141,74 @@ pub fn read_file_from_branch(
     }
 }
 
+/// Remove a file from a specific branch.
+/// Returns the commit OID if a commit was created, None if the file didn't exist.
+pub fn remove_file_from_branch(
+    repo_path: &Path,
+    branch_name: &str,
+    file_path: &Path,
+    message: &str,
+) -> Result<Option<Oid>> {
+    let repo = Repository::discover(repo_path)?;
+    let signature = repo
+        .signature()
+        .or_else(|_| Signature::now("itack", "itack@localhost"))?;
+
+    let file_path_str = file_path.to_string_lossy();
+
+    let branch_ref = format!("refs/heads/{}", branch_name);
+    let reference = repo.find_reference(&branch_ref)?;
+    let parent_commit = reference.peel_to_commit()?;
+    let parent_tree = parent_commit.tree()?;
+
+    // Navigate to the parent directory and remove the entry
+    let parts: Vec<&str> = file_path_str.split('/').collect();
+    let new_tree = if parts.len() == 1 {
+        let mut builder = repo.treebuilder(Some(&parent_tree))?;
+        builder.remove(parts[0])?;
+        let tree_oid = builder.write()?;
+        repo.find_tree(tree_oid)?
+    } else {
+        // Nested path (e.g. ".itack/filename.md")
+        let dir_name = parts[0];
+        let file_name = parts[1..].join("/");
+
+        let dir_entry = match parent_tree.get_name(dir_name) {
+            Some(entry) => entry,
+            None => return Ok(None),
+        };
+        let dir_tree = repo.find_tree(dir_entry.id())?;
+
+        let mut sub_builder = repo.treebuilder(Some(&dir_tree))?;
+        if sub_builder.get(&file_name)?.is_none() {
+            return Ok(None);
+        }
+        sub_builder.remove(&file_name)?;
+        let sub_tree_oid = sub_builder.write()?;
+
+        let mut builder = repo.treebuilder(Some(&parent_tree))?;
+        builder.insert(dir_name, sub_tree_oid, FileMode::Tree.into())?;
+        let tree_oid = builder.write()?;
+        repo.find_tree(tree_oid)?
+    };
+
+    // Check if tree actually changed
+    if parent_tree.id() == new_tree.id() {
+        return Ok(None);
+    }
+
+    let commit_oid = repo.commit(
+        Some(&branch_ref),
+        &signature,
+        &signature,
+        message,
+        &new_tree,
+        &[&parent_commit],
+    )?;
+
+    Ok(Some(commit_oid))
+}
+
 /// Find an issue file in a branch by issue ID.
 /// Returns the relative path if found.
 pub fn find_issue_in_branch(
