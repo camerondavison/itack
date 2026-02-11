@@ -32,5 +32,5 @@ check-plugin-manifest:
 
 # Install the binary locally
 install:
-    cargo install --path .
+    cargo install itack
     claude plugin marketplace update itack-marketplace
