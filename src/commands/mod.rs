@@ -15,6 +15,7 @@ pub mod search;
 pub mod set_session;
 pub mod show;
 pub mod undepend;
+pub mod wontfix;
 
 use crate::cli::{Cli, Commands};
 use crate::error::Result;
@@ -51,6 +52,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         Commands::Edit { id, body, message } => edit::run(edit::EditArgs { id, body, message }),
 
         Commands::Done { id } => done::run(done::DoneArgs { id }),
+
+        Commands::WontFix { id } => wontfix::run(wontfix::WontFixArgs { id }),
 
         Commands::Claim {
             id,

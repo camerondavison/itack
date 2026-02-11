@@ -454,6 +454,88 @@ fn test_done_nonexistent_issue() {
 }
 
 #[test]
+fn test_wontfix_command() {
+    let env = setup_git_repo();
+
+    itack(&env)
+        .arg("init")
+        .current_dir(env.path())
+        .assert()
+        .success();
+
+    itack(&env)
+        .args(["create", "Test issue"])
+        .current_dir(env.path())
+        .assert()
+        .success();
+
+    // Mark as wont-fix
+    itack(&env)
+        .args(["wont-fix", "1"])
+        .current_dir(env.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("open -> wont-fix"));
+
+    // Verify in list
+    itack(&env)
+        .args(["list", "--status", "wont-fix"])
+        .current_dir(env.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Test issue"));
+}
+
+#[test]
+fn test_wontfix_already_wontfix() {
+    let env = setup_git_repo();
+
+    itack(&env)
+        .arg("init")
+        .current_dir(env.path())
+        .assert()
+        .success();
+
+    itack(&env)
+        .args(["create", "Test issue"])
+        .current_dir(env.path())
+        .assert()
+        .success();
+
+    itack(&env)
+        .args(["wont-fix", "1"])
+        .current_dir(env.path())
+        .assert()
+        .success();
+
+    // Already wont-fix should fail
+    itack(&env)
+        .args(["wont-fix", "1"])
+        .current_dir(env.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already wont-fix"));
+}
+
+#[test]
+fn test_wontfix_nonexistent_issue() {
+    let env = setup_git_repo();
+
+    itack(&env)
+        .arg("init")
+        .current_dir(env.path())
+        .assert()
+        .success();
+
+    itack(&env)
+        .args(["wont-fix", "999"])
+        .current_dir(env.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Issue 999 not found"));
+}
+
+#[test]
 fn test_issue_ids_increment() {
     let env = setup_git_repo();
 

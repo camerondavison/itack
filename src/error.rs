@@ -34,6 +34,9 @@ pub enum ItackError {
     #[error("Issue {0} is already done")]
     AlreadyDone(u32),
 
+    #[error("Issue {0} is already wont-fix")]
+    AlreadyWontFix(u32),
+
     #[error("Data branch '{0}' not found. Run 'itack init' to create it.")]
     DataBranchNotFound(String),
 

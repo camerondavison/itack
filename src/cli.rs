@@ -71,6 +71,12 @@ pub enum Commands {
         id: u32,
     },
 
+    /// Mark issue as wont-fix
+    WontFix {
+        /// Issue ID
+        id: u32,
+    },
+
     /// Claim an issue for an assignee
     Claim {
         /// Issue ID

@@ -7,9 +7,10 @@ description: >
     (2) Create new issues with titles and descriptions
     (3) Claim issues to work on them
     (4) Mark issues as done when completed
-    (5) Release claimed issues if needed
-    (6) Check database health with doctor command
-    (7) Search issues by query.
+    (5) Mark issues as wont-fix
+    (6) Release claimed issues if needed
+    (7) Check database health with doctor command
+    (8) Search issues by query.
 allowed-tools: Bash(itack *)
 ---
 
@@ -76,6 +77,9 @@ itack claim <id> <assignee-name> --session <session-id>
 
 # Mark an issue as done
 itack done <id>
+
+# Mark an issue as wont-fix
+itack wont-fix <id>
 
 # Release a claimed issue without completing
 itack release <id>
