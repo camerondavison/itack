@@ -6,6 +6,9 @@ default:
 test:
     cargo test
 
+release:
+    cargo release patch --execute
+
 # Format and auto-fix code
 fix:
     just --fmt --unstable
